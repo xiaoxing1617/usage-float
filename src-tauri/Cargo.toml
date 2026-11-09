@@ -1,8 +1,10 @@
 [package]
 name = "usage-float"
 version = "0.1.0"
-description = "A Tauri App"
-authors = ["you"]
+description = "macOS floating widget for Claude and GPT usage"
+authors = ["xiaoxing1617"]
+license = "MIT"
+repository = "https://github.com/xiaoxing1617/usage-float"
 edition = "2024"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

@@ -158,6 +158,10 @@ cd src-tauri && cargo test
 
 每個版本修正了什麼、新增了什麼、優化了什麼，請見 [CHANGELOG.md](CHANGELOG.md)。
 
+## 開源授權
+
+[MIT](LICENSE)：可免費使用、修改、商用與再散布，只需保留版權聲明。
+
 ## 聲明
 
 本專案為個人開源專案，與 Anthropic、OpenAI、ip.net.coffee 無任何關聯。額度、價格、評分皆來自公開或非官方資料來源，僅供參考。

@@ -158,6 +158,10 @@ Stack: Tauri 2 · Rust · React · TypeScript.
 
 What each version added, improved and fixed: [CHANGELOG.md](CHANGELOG.md).
 
+## License
+
+[MIT](LICENSE): free to use, modify, sell and redistribute, as long as the copyright notice is kept.
+
 ## Disclaimer
 
 This is a personal open-source project, not affiliated with Anthropic, OpenAI or ip.net.coffee. Quotas, prices and scores come from public or unofficial sources and are for reference only.
