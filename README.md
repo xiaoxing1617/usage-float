@@ -154,6 +154,10 @@ cd src-tauri && cargo test
 
 技术栈：Tauri 2 · Rust · React · TypeScript。
 
+## 更新日志
+
+每个版本修复了什么、加了什么、优化了什么，见 [CHANGELOG.md](CHANGELOG.md)。
+
 ## 声明
 
 本项目是个人开源项目，与 Anthropic、OpenAI、ip.net.coffee 没有任何关联。额度、价格、评分都来自公开或非官方的数据源，仅供参考。
