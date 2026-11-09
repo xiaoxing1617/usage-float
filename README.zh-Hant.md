@@ -96,7 +96,7 @@
 
 ### 方法三：下載安裝檔
 
-如果 [Releases](https://github.com/xiaoxing1617/usage-float/releases) 頁面有 `.dmg`，下載後把 app 拖進「應用程式」。
+到 [Releases](https://github.com/xiaoxing1617/usage-float/releases/latest) 下載最新的 `Usage-Float_x.y.z_universal.dmg`（Apple 晶片與 Intel 通用），開啟後把 app 拖進「應用程式」。不想安裝開發工具的話，這是最簡單的方式。
 
 這個 app 沒有 Apple 開發者簽章，第一次開啟時 macOS 會阻擋。處理方式：在 Finder 中**按右鍵點 app → 打開 → 打開**；若沒有「打開」按鈕，請到「系統設定 → 隱私權與安全性」，往下找到它並點「強制打開」。
 

@@ -96,7 +96,7 @@ When it's done, the widget's icon appears in the menu bar.
 
 ### Option 3: download a build
 
-If the [Releases](https://github.com/xiaoxing1617/usage-float/releases) page has a `.dmg`, download it and drag the app into Applications.
+Download the latest `Usage-Float_x.y.z_universal.dmg` (Apple silicon and Intel) from [Releases](https://github.com/xiaoxing1617/usage-float/releases/latest), open it and drag the app into Applications. This is the easiest way if you don't want to install developer tools.
 
 The app isn't signed with an Apple Developer ID, so macOS blocks it the first time. To open it: in Finder, **right-click the app → Open → Open**. If there's no Open button, go to **System Settings → Privacy & Security**, scroll down and click **Open Anyway**.
 
