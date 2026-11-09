@@ -2,6 +2,15 @@
 
 [简体中文](README.md) · **English** · [繁體中文](README.zh-Hant.md)
 
+<p>
+  <a href="https://github.com/xiaoxing1617/usage-float/stargazers"><img src="https://img.shields.io/github/stars/xiaoxing1617/usage-float?style=social" alt="GitHub stars"></a>
+  <img src="https://img.shields.io/badge/platform-macOS%2011%2B-black?logo=apple" alt="macOS 11+">
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/xiaoxing1617/usage-float" alt="MIT"></a>
+</p>
+
+> ⭐ **If this little tool helps you, please give it a Star (top right)!** Every star keeps me going and helps others find it.
+
+
 A small floating widget for your Mac desktop that keeps your **Claude** and **GPT (Codex)** usage in view: remaining quota, reset times, plan, usage by period, and what it would cost at API prices (USD / CNY / JPY / SGD / EUR).
 
 > [!IMPORTANT]
@@ -26,7 +35,7 @@ A small floating widget for your Mac desktop that keeps your **Claude** and **GP
 - **Public IP**: the egress IP websites see, with country and state/province (in the UI language).
 - **IP trust score & latency**: a 🛡 score (0–100, red to green) and latency in ms next to the Claude and GPT names. Click the score for the full IP check; click the latency to see how it is measured.
 - **Three languages**: English, 简体中文, 繁體中文. Picked from the system language on first launch, falling back to English; change it in Settings.
-- Follows the system light/dark mode; optional "always on top".
+- **Theme**: Auto (follow system), Light or Dark, Auto by default; optional "always on top".
 
 ## Requirements
 

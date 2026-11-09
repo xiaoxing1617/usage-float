@@ -2,6 +2,15 @@
 
 **简体中文** · [English](README.en.md) · [繁體中文](README.zh-Hant.md)
 
+<p>
+  <a href="https://github.com/xiaoxing1617/usage-float/stargazers"><img src="https://img.shields.io/github/stars/xiaoxing1617/usage-float?style=social" alt="GitHub stars"></a>
+  <img src="https://img.shields.io/badge/platform-macOS%2011%2B-black?logo=apple" alt="macOS 11+">
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/xiaoxing1617/usage-float" alt="MIT"></a>
+</p>
+
+> ⭐ **如果这个小工具对你有帮助，请点一下右上角的 Star 支持一下！** 你的每一个 Star 都是我继续更新的动力，也能让更多人发现它。
+
+
 一个常驻在 Mac 桌面上的小浮窗，帮你随时看到 **Claude** 和 **GPT（Codex）** 的用量：还剩多少额度、什么时候重置、会员等级、按时间段统计的用量，以及折合多少钱（美元 / 人民币 / 日元 / 新币 / 欧元）。
 
 > [!IMPORTANT]
@@ -26,7 +35,7 @@
 - **出口 IP**：显示网站看到的公网出口 IP，以及国家和省 / 州（跟随界面语言）。
 - **IP 信任评分和延迟**：在 Claude、GPT 名称后面显示 🛡 评分（0–100，颜色从红到绿）和延迟毫秒数。点评分打开完整检测页，点毫秒数查看延迟是怎么测的。
 - **三种语言**：简体中文、繁體中文、English。首次打开时按系统语言自动选择，其他语言默认用英文；可以在设置里改。
-- 浅色 / 深色模式自动跟随系统；可设置“始终置顶”。
+- **主题**：自动（跟随系统）、浅色、暗色，默认自动；可设置“始终置顶”。
 
 ## 设备和系统要求
 

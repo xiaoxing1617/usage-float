@@ -14,11 +14,12 @@
   --chip: rgba(0, 0, 0, 0.05);
   --chip-on: #1c1c1f;
   --chip-on-text: #fff;
+  --fast: #1b8a2d;
   color-scheme: light dark;
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: rgba(28, 28, 32, 0.84);
     --card: rgba(255, 255, 255, 0.06);
     --border: rgba(255, 255, 255, 0.09);
@@ -29,7 +30,27 @@
     --chip-on: #ececf1;
     --chip-on-text: #1c1c1f;
     --accent: #8ea2ff;
+    --fast: #4cc46a;
   }
+}
+:root[data-theme="dark"] {
+  --bg: rgba(28, 28, 32, 0.84);
+  --card: rgba(255, 255, 255, 0.06);
+  --border: rgba(255, 255, 255, 0.09);
+  --text: #ececf1;
+  --muted: #9a9aa6;
+  --track: rgba(255, 255, 255, 0.1);
+  --chip: rgba(255, 255, 255, 0.07);
+  --chip-on: #ececf1;
+  --chip-on-text: #1c1c1f;
+  --accent: #8ea2ff;
+  --fast: #4cc46a;
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
 }
 
 * {
@@ -681,7 +702,7 @@ input {
   font-weight: 500;
 }
 .net .lat.fast {
-  color: #1b8a2d;
+  color: var(--fast);
 }
 .net .lat.ok {
   color: var(--ok);
@@ -691,11 +712,6 @@ input {
 }
 .net:hover .score {
   filter: brightness(1.08);
-}
-@media (prefers-color-scheme: dark) {
-  .net .lat.fast {
-    color: #4cc46a;
-  }
 }
 
 /* labelled title bar buttons */
@@ -861,7 +877,7 @@ input {
   font-variant-numeric: tabular-nums;
 }
 .lat.fast {
-  color: #1b8a2d;
+  color: var(--fast);
 }
 .lat.ok {
   color: var(--ok);
@@ -906,21 +922,13 @@ input {
   margin-right: 6px;
 }
 .d.fast {
-  background: #1b8a2d;
+  background: var(--fast);
 }
 .d.ok {
   background: var(--ok);
 }
 .d.slow {
   background: var(--low);
-}
-@media (prefers-color-scheme: dark) {
-  .lat.fast {
-    color: #4cc46a;
-  }
-  .d.fast {
-    background: #4cc46a;
-  }
 }
 
 .iploc {

@@ -1,6 +1,6 @@
 [package]
 name = "usage-float"
-version = "0.1.0"
+version = "0.2.0"
 description = "macOS floating widget for Claude and GPT usage"
 authors = ["xiaoxing1617"]
 license = "MIT"

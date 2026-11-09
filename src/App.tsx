@@ -40,6 +40,7 @@ import "./App.css";
 
 interface Settings {
   lang: Lang;
+  theme: Theme;
   currency: Currency;
   autoPrices: boolean;
   claudeQuota: boolean;
@@ -54,6 +55,8 @@ interface Settings {
 }
 
 type Mode = "full" | "ball";
+type Theme = "auto" | "light" | "dark";
+const THEMES: Theme[] = ["auto", "light", "dark"];
 
 const SETTINGS_KEY = "uf.settings";
 
@@ -61,6 +64,7 @@ function loadSettings(): Settings {
   const today = ymd(new Date());
   const defaults: Settings = {
     lang: detectLang(),
+    theme: "auto",
     currency: "USD",
     autoPrices: false,
     claudeQuota: false,
@@ -230,6 +234,11 @@ export default function App() {
   useEffect(() => {
     document.documentElement.lang = s.lang;
   }, [s.lang]);
+  useEffect(() => {
+    const root = document.documentElement;
+    if (s.theme === "auto") delete root.dataset.theme;
+    else root.dataset.theme = s.theme;
+  }, [s.theme]);
 
   const money = (usd: number) => (rates ? formatMoney(usd, s.currency, rates, locale) : "…");
 
@@ -1051,6 +1060,16 @@ function SettingsView(props: {
             {LANGS.map((l) => (
               <option key={l.id} value={l.id}>
                 {l.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="row">
+          <span>{t.theme}</span>
+          <select value={s.theme} onChange={(e) => update({ theme: e.target.value as Theme })}>
+            {THEMES.map((th) => (
+              <option key={th} value={th}>
+                {t[`theme_${th}`]}
               </option>
             ))}
           </select>
