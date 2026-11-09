@@ -1,13 +1,12 @@
-# 更新日志 · Changelog
+# 更新日志
 
 每个版本的改动都记录在这里，分为 **新增**、**优化**、**修复** 三类。最新的版本在最上面。
-All notable changes are listed here, newest first, grouped as Added / Improved / Fixed.
 
 ## [0.1.0] - 2026-11-10
 
-第一个公开版本。First public release.
+第一个公开版本。
 
-### 新增 Added
+### 新增
 
 - Claude 和 GPT（Codex）的 5 小时、每周剩余额度，显示剩余百分比和重置倒计时。
 - 会员等级显示（Pro / Max / Plus 等）。
@@ -23,7 +22,7 @@ All notable changes are listed here, newest first, grouped as Added / Improved /
 - 菜单栏图标（显示 / 隐藏 / 退出），不占用程序坞；浅色 / 深色模式；始终置顶选项。
 - 三种语言的 README。
 
-### 优化 Improved
+### 优化
 
 - 展开、收起或切换悬浮球时，窗口自动保持在屏幕可见范围内。
 - 悬浮球数字带 %，并标明 5 小时和周额度，100% 也能完整显示。
@@ -31,7 +30,7 @@ All notable changes are listed here, newest first, grouped as Added / Improved /
 - 延迟改为在已建立的连接上测量往返时间，不再把 DNS / TLS 握手算进去。
 - 金额使用明确的货币符号（US$、S$、¥、JP¥、€），避免混淆。
 
-### 修复 Fixed
+### 修复
 
 - Claude 额度接口返回 `http_429` 时不再反复请求：遵守 Retry-After，否则从 5 分钟开始退避，并保留上一次成功的数据。
 - 收起悬浮球后面板被屏幕右下角挡住的问题。
