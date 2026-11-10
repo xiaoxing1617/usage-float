@@ -7,6 +7,10 @@ export const LANGS: { id: Lang; label: string }[] = [
 ];
 
 const en = {
+  openErr_not_found: "This conversation no longer exists or was deleted",
+  openErr_app_claude: "Claude desktop app not found",
+  openErr_app_codex: "ChatGPT / Codex app not found",
+  openErr_other: "Couldn't open this conversation",
   pillRunning: "{n} running",
   pillDone: "{n} done",
   taskDoneN: "{n} done",
@@ -178,6 +182,10 @@ const en = {
 export type Dict = typeof en;
 
 const zhHans: Dict = {
+  openErr_not_found: "这个对话已不存在或已被删除",
+  openErr_app_claude: "没有找到 Claude 桌面版",
+  openErr_app_codex: "没有找到 ChatGPT / Codex App",
+  openErr_other: "打不开这个对话",
   pillRunning: "{n} 进行中",
   pillDone: "{n} 已完成",
   taskDoneN: "{n} 个已完成",
@@ -343,6 +351,10 @@ const zhHans: Dict = {
 };
 
 const zhHant: Dict = {
+  openErr_not_found: "這個對話已不存在或已被刪除",
+  openErr_app_claude: "找不到 Claude 桌面版",
+  openErr_app_codex: "找不到 ChatGPT／Codex App",
+  openErr_other: "無法開啟這個對話",
   pillRunning: "{n} 進行中",
   pillDone: "{n} 已完成",
   taskDoneN: "{n} 個已完成",

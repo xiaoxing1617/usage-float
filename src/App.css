@@ -586,10 +586,15 @@ input {
   margin: 0;
   box-sizing: border-box;
   border-radius: 9px;
-  display: grid;
-  place-items: center;
-  font: 750 10px/1 inherit;
-  font-family: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0;
+  text-align: center;
   color: #fff;
   border: 1.5px solid var(--bg-solid);
   font-variant-numeric: tabular-nums;
@@ -944,6 +949,49 @@ button.ttitle:hover {
 .task.live .tdur {
   color: var(--side);
 }
+/* jump failed: shake once, tint red, explain in place of the meta line */
+.task.err {
+  animation: task-shake 0.42s cubic-bezier(0.36, 0.07, 0.19, 0.97);
+  background: color-mix(in srgb, var(--crit) 9%, transparent);
+  border-color: color-mix(in srgb, var(--crit) 28%, transparent);
+}
+@keyframes task-shake {
+  10%,
+  90% {
+    transform: translateX(-1px);
+  }
+  20%,
+  80% {
+    transform: translateX(2px);
+  }
+  30%,
+  50%,
+  70% {
+    transform: translateX(-3px);
+  }
+  40%,
+  60% {
+    transform: translateX(3px);
+  }
+}
+.terr {
+  font-size: 10px;
+  line-height: 1.3;
+  color: var(--crit);
+  font-weight: 600;
+  animation: terr-in 0.25s ease both;
+}
+@keyframes terr-in {
+  from {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 .tsep {
   display: flex;
   align-items: center;
@@ -1004,12 +1052,7 @@ button.ttitle:hover {
   transform: translateY(-1px);
 }
 
-/* badge when nothing is running: shows the finished count, no ripple */
-.busy.idle {
-  background: var(--bg-solid);
-  color: var(--glow);
-  border-color: var(--glow);
-}
+/* badge when nothing is running: same look, finished count, no ripple */
 .busy.idle::before,
 .busy.idle::after {
   animation: none;

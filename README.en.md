@@ -11,7 +11,7 @@
 > ⭐ **If this little tool helps you, please give it a Star (top right)!** Every star keeps me going and helps others find it.
 
 
-A small floating widget for your Mac desktop that keeps your **Claude** and **GPT (Codex)** usage in view: remaining quota, reset times, plan, usage by period, and what it would cost at API prices (USD / CNY / JPY / SGD / EUR).
+A small floating widget for your Mac desktop that keeps your **Claude** and **ChatGPT (Codex)** usage in view: remaining quota, reset times, plan, usage by period, and what it would cost at API prices (USD / CNY / JPY / SGD / EUR).
 
 > [!IMPORTANT]
 > **macOS only** (macOS 11 Big Sur or later, Apple silicon or Intel). Windows, Linux, iPhone and iPad are not supported.
@@ -26,14 +26,14 @@ A small floating widget for your Mac desktop that keeps your **Claude** and **GP
 
 ## Features
 
-- **Remaining quota**: 5-hour and weekly windows for Claude and GPT, with percentage left and reset countdown.
+- **Remaining quota**: 5-hour and weekly windows for Claude and ChatGPT, with percentage left and reset countdown.
 - **Plan**: Pro / Max / Plus and so on.
 - **Usage stats**: today, yesterday, this week, last week, this month, last month, last 7 days, last 30 days, or a custom range; broken down by model and by day.
 - **Cost estimate (optional)**: with "Fetch model prices automatically" on, prices are refreshed every 12 hours from the [LiteLLM price table](https://github.com/BerriAI/litellm). Every price change is kept, and each usage event is priced at the rate **in effect at that time** (if a model cost $5 yesterday and $3 today, each day is priced separately). With it off, no cost is shown.
 - **Currencies**: USD, CNY, JPY, SGD, EUR, with ECB rates from [Frankfurter](https://frankfurter.dev).
-- **Floating ball**: shrink to a small ball, Claude on the left and GPT on the right; the outer ring is the 5-hour quota, the inner ring the weekly quota. Click to expand, drag to move. While a conversation is running, a badge shows how many Claude Code / Codex conversations are in progress, with a soft ripple. A bubble beside the ball lists each task's title and how long it has been running; click Collapse at the bottom to hide it and the number to bring it back (remembered separately for Claude and GPT). Finished tasks stay under "Finished" until you remove them with ×; click a title to open that conversation (Codex and the Claude desktop app).
+- **Floating ball**: shrink to a small ball, Claude on the left and ChatGPT on the right; the outer ring is the 5-hour quota, the inner ring the weekly quota. Click to expand, drag to move. While a conversation is running, a badge shows how many Claude Code / Codex conversations are in progress, with a soft ripple. A bubble beside the ball lists each task's title and how long it has been running; click Collapse at the bottom to hide it and the number to bring it back (remembered separately for Claude and ChatGPT). Finished tasks stay under "Finished" until you remove them with ×; click a title to open that conversation (Codex and the Claude desktop app).
 - **Public IP**: the egress IP websites see, with country and state/province (in the UI language).
-- **IP trust score & latency**: a 🛡 score (0–100, red to green) and latency in ms next to the Claude and GPT names. Click the score for the full IP check; click the latency to see how it is measured.
+- **IP trust score & latency**: a 🛡 score (0–100, red to green) and latency in ms next to the Claude and ChatGPT names. Click the score for the full IP check; click the latency to see how it is measured.
 - **Three languages**: English, 简体中文, 繁體中文. Picked from the system language on first launch, falling back to English; change it in Settings.
 - **Theme**: Auto (follow system), Light or Dark, Auto by default; optional "always on top".
 
@@ -110,7 +110,7 @@ The app isn't signed with an Apple Developer ID, so macOS blocks it the first ti
 
 ### Where the Claude quota comes from
 
-The GPT quota is read straight from the Codex logs. By default, the Claude quota comes from:
+The ChatGPT quota is read straight from the Codex logs. By default, the Claude quota comes from:
 
 **`/usage` (on by default, recommended)**: every 10 minutes the widget runs Claude Code's own `/usage` command in the background (`claude -p "/usage" --no-session-persistence`) and reads the 5-hour, weekly and per-model quota. It is a local command: **no chat, no tokens, no cost**, and nothing is added to your session history. It only needs the Claude Code CLI installed and signed in on this Mac.
 

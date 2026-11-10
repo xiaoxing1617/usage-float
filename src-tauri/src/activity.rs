@@ -293,17 +293,39 @@ fn valid_local_id(s: &str) -> bool {
 
 /// Opens a conversation in its app. Only builds the two known deep links,
 /// from validated ids, so nothing else can be opened through this.
+/// Errors: "not_found" (conversation deleted), "app_missing", "not_openable".
 pub fn open_task(provider: &str, id: &str) -> Result<(), String> {
     let url = match provider {
-        "openai" if is_uuid(id) => format!("codex://threads/{id}"),
+        "openai" if is_uuid(id) => {
+            if !codex_exists(id) {
+                return Err("not_found".into());
+            }
+            format!("codex://threads/{id}")
+        }
         "claude" if is_uuid(id) => {
-            let d = desktop_sessions().remove(id).ok_or("not_openable")?;
+            let d = desktop_sessions().remove(id).ok_or("not_found")?;
             format!("claude://code/continue?session={}", d.local_id)
         }
         _ => return Err("not_openable".into()),
     };
-    std::process::Command::new("/usr/bin/open").arg(url).status().map_err(|e| e.to_string())?;
+    // `open` fails when no installed app handles the link.
+    let out = std::process::Command::new("/usr/bin/open").arg(url).output().map_err(|e| e.to_string())?;
+    if !out.status.success() {
+        return Err("app_missing".into());
+    }
     Ok(())
+}
+
+/// The Codex conversation still has a rollout file (live or archived).
+fn codex_exists(id: &str) -> bool {
+    let home = dirs::home_dir().unwrap_or_default();
+    [home.join(".codex/sessions"), home.join(".codex/archived_sessions")].iter().any(|root| {
+        walkdir::WalkDir::new(root)
+            .max_depth(4)
+            .into_iter()
+            .flatten()
+            .any(|e| e.file_type().is_file() && e.file_name().to_str().is_some_and(|n| n.starts_with("rollout-") && n.contains(id)))
+    })
 }
 
 /// Session id from `rollout-2026-11-10T13-14-40-<uuid>[_<uuid>].jsonl`.
@@ -368,6 +390,15 @@ mod tests {
         assert_eq!(codex_id(n).as_deref(), Some("01a14a9e-4b61-72f0-9f57-ff86914a5453"));
         let n = "rollout-2026-11-10T13-14-40-01a14a9e-4b61-72f0-9f57-ff86914a5453.jsonl";
         assert_eq!(codex_id(n).as_deref(), Some("01a14a9e-4b61-72f0-9f57-ff86914a5453"));
+    }
+
+    #[test]
+    fn open_rejects_missing_and_bad_ids() {
+        // A well-formed id that doesn't exist is reported, and nothing is opened.
+        assert_eq!(open_task("openai", "00000000-0000-0000-0000-000000000000").unwrap_err(), "not_found");
+        assert_eq!(open_task("claude", "00000000-0000-0000-0000-000000000000").unwrap_err(), "not_found");
+        assert_eq!(open_task("openai", "../../etc").unwrap_err(), "not_openable");
+        assert_eq!(open_task("other", "00000000-0000-0000-0000-000000000000").unwrap_err(), "not_openable");
     }
 
     #[test]

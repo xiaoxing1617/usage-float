@@ -85,6 +85,9 @@ export function mockInvoke(cmd: string, args?: Record<string, unknown>): Promise
         fetched_at: Date.now() - 3 * 60_000,
         error: null,
       });
+    case "open_task":
+      // Demo: the conversation was deleted.
+      return Promise.reject("not_found");
     case "get_activity":
       return Promise.resolve({
         claude: 2,

@@ -11,6 +11,7 @@ import {
   getClaudeQuota,
   getClaudeCliUsage,
   getActivity,
+  openTask,
   type Activity,
   type CliUsage,
   getPublicIp,
@@ -556,7 +557,7 @@ export default function App() {
           />
           <QuotaCard
             provider="openai"
-            name="GPT"
+            name="ChatGPT"
             net={
               s.netCheck && (
                 <NetBadge
@@ -646,7 +647,7 @@ const TRACE: Record<ProviderId, string> = {
   claude: "https://claude.ai/cdn-cgi/trace",
   openai: "https://chatgpt.com/cdn-cgi/trace",
 };
-const PNAME: Record<ProviderId, string> = { claude: "Claude", openai: "GPT" };
+const PNAME: Record<ProviderId, string> = { claude: "Claude", openai: "ChatGPT" };
 
 type DrawerState = { kind: "site" | "latency"; provider: ProviderId } | null;
 
@@ -966,7 +967,7 @@ function leftFor(ws: QuotaWindow[], key: string, now: number): number | null {
 const lvl = (p: number | null) => (p == null ? "" : p <= 10 ? "crit" : p <= 30 ? "low" : "ok");
 
 /**
- * Round widget: left half = Claude, right half = GPT.
+ * Round widget: left half = Claude, right half = ChatGPT.
  * Each half: "5h" caption, big 5-hour remaining %, weekly remaining underneath.
  * The ring halves fill from the bottom by the 5-hour remaining.
  */
@@ -1002,7 +1003,7 @@ function Ball(props: {
       tasks: list,
     };
   };
-  const sides = [sideOf("claude", "Claude", claude), sideOf("openai", "GPT", gpt)];
+  const sides = [sideOf("claude", "Claude", claude), sideOf("openai", "ChatGPT", gpt)];
 
   // Click opens the panel; dragging past a few pixels moves the window instead.
   const start = useRef<{ x: number; y: number } | null>(null);
@@ -1226,8 +1227,26 @@ function TaskBubble(props: {
     return () => ro.disconnect();
   }, []);
   useEffect(checkMore, [tasks.length]);
+  // When a jump fails, the row shakes and says why for a few seconds.
+  const [err, setErr] = useState<{ id: string; msg: string } | null>(null);
+  const errTimer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(errTimer.current), []);
   const open = (task: TrackedTask) => {
-    if (task.openable && isTauri()) invoke("open_task", { provider: side, id: task.id }).catch(() => {});
+    if (!task.openable) return;
+    openTask(side, task.id).catch((e) => {
+      const code = String(e);
+      const msg =
+        code === "not_found"
+          ? t.openErr_not_found
+          : code === "app_missing"
+            ? side === "claude"
+              ? t.openErr_app_claude
+              : t.openErr_app_codex
+            : t.openErr_other;
+      window.clearTimeout(errTimer.current);
+      setErr({ id: task.id, msg });
+      errTimer.current = window.setTimeout(() => setErr(null), 4000);
+    });
   };
   return (
     <div className={`bubble ${side}` + (closing ? " closing" : "")} role="dialog" aria-label={name}>
@@ -1257,7 +1276,7 @@ function TaskBubble(props: {
                   <span>{t.taskDoneSection}</span>
                 </li>
               )}
-              <li className={"task" + (live ? " live" : " done")} style={{ animationDelay: `${40 + i * 40}ms` }}>
+              <li className={"task" + (live ? " live" : " done") + (err?.id === task.id ? " err" : "")} style={{ animationDelay: `${40 + i * 40}ms` }}>
                 <span className="tstate" aria-hidden="true">
                   {live ? (
                     <span className="eq">
@@ -1296,22 +1315,18 @@ function TaskBubble(props: {
                       </button>
                     )}
                   </span>
-                  <span className="tmeta">
-                    <span title={task.created_at != null ? new Date(task.created_at).toLocaleString() : undefined}>
-                      {task.created_at != null
-                        ? fmt(t.taskCreated, {
-                            t: relTime(task.created_at, now, t),
-                          })
-                        : ""}
+                  {err?.id === task.id ? (
+                    <span className="terr" role="alert">
+                      {err.msg}
                     </span>
-                    {ran && (
-                      <span className="tdur">
-                        {fmt(live ? t.taskRunningFor : t.taskRanFor, {
-                          t: ran,
-                        })}
+                  ) : (
+                    <span className="tmeta">
+                      <span title={task.created_at != null ? new Date(task.created_at).toLocaleString() : undefined}>
+                        {task.created_at != null ? fmt(t.taskCreated, { t: relTime(task.created_at, now, t) }) : ""}
                       </span>
-                    )}
-                  </span>
+                      {ran && <span className="tdur">{fmt(live ? t.taskRunningFor : t.taskRanFor, { t: ran })}</span>}
+                    </span>
+                  )}
                 </span>
               </li>
             </Fragment>
@@ -1457,7 +1472,7 @@ function Stats(props: {
           <div key={p} className="tot">
             <div className="muted tiny">
               <span className={"swatch " + p} />
-              {p === "claude" ? "Claude" : "GPT"}
+              {p === "claude" ? "Claude" : "ChatGPT"}
             </div>
             <div className="big">{withCost ? money(byProvider[p].cost) : compact(byProvider[p].tokens)}</div>
             <div className="muted tiny">{withCost ? `${compact(byProvider[p].tokens)} ${t.tokens}` : t.tokens}</div>
@@ -1488,7 +1503,7 @@ function Stats(props: {
             <div className="chart" role="img" aria-label={t.daily}>
               {days.map((d) => {
                 const v = byDay.get(d) ?? { claude: 0, openai: 0 };
-                const tip = `${d}  Claude ${withCost ? money(v.claude) : compact(v.claude)} · GPT ${withCost ? money(v.openai) : compact(v.openai)}`;
+                const tip = `${d}  Claude ${withCost ? money(v.claude) : compact(v.claude)} · ChatGPT ${withCost ? money(v.openai) : compact(v.openai)}`;
                 return (
                   <div key={d} className="col" title={tip}>
                     <div className="seg openai" style={{ height: `${(v.openai / max) * 100}%` }} />

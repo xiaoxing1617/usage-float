@@ -106,6 +106,8 @@ export interface Activity {
   codex_tasks: RunningTask[];
 }
 export const getActivity = () => invoke<Activity>("get_activity");
+/** Rejects with "not_found", "app_missing" or "not_openable". */
+export const openTask = (provider: ProviderId, id: string) => invoke<void>("open_task", { provider, id });
 export interface IpInfo {
   ip: string | null;
   country: string | null;
