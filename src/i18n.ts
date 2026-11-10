@@ -7,6 +7,9 @@ export const LANGS: { id: Lang; label: string }[] = [
 ];
 
 const en = {
+  taskExpand: "Show running tasks",
+  taskCollapse: "Collapse",
+  taskUntitled: "Untitled conversation",
   cliTitle: "Claude quota via /usage (recommended)",
   cliHint: "Runs Claude Code's own /usage command in the background every 10 minutes. No chat, no tokens, no cost, and nothing is added to your session history. Needs Claude Code installed and signed in on this Mac.",
   cliFrom: "From Claude Code /usage, {t} ago",
@@ -161,6 +164,9 @@ const en = {
 export type Dict = typeof en;
 
 const zhHans: Dict = {
+  taskExpand: "展开任务列表",
+  taskCollapse: "收起",
+  taskUntitled: "未命名对话",
   cliTitle: "用 /usage 读取 Claude 额度（推荐）",
   cliHint: "每 10 分钟在后台运行一次 Claude Code 自带的 /usage 命令。不聊天、不消耗 token、不花钱，也不会在你的会话历史里留下记录。需要这台 Mac 上装好并登录 Claude Code。",
   cliFrom: "来自 Claude Code /usage，{t}前",
@@ -309,6 +315,9 @@ const zhHans: Dict = {
 };
 
 const zhHant: Dict = {
+  taskExpand: "展開任務列表",
+  taskCollapse: "收起",
+  taskUntitled: "未命名對話",
   cliTitle: "用 /usage 讀取 Claude 額度（推薦）",
   cliHint: "每 10 分鐘在背景執行一次 Claude Code 內建的 /usage 指令。不聊天、不消耗 token、不花錢，也不會在你的對話紀錄中留下紀錄。需要這台 Mac 上已安裝並登入 Claude Code。",
   cliFrom: "來自 Claude Code /usage，{t}前",

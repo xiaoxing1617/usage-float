@@ -513,8 +513,16 @@ input {
 }
 
 /* floating ball: left half Claude, right half GPT */
+.ballstage {
+  display: flex;
+  align-items: flex-start;
+  width: max-content;
+  min-height: 108px;
+}
 .ballwrap {
-  height: 100%;
+  flex: none;
+  width: 108px;
+  height: 108px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -567,25 +575,34 @@ input {
   stroke: var(--crit);
   opacity: 1;
 }
-/* running conversations: a count badge with a soft ripple */
+/* running conversations: count badge with two soft ripples */
 .busy {
   position: absolute;
   top: 5px;
-  min-width: 17px;
-  height: 17px;
+  z-index: 2;
+  min-width: 18px;
+  height: 18px;
   padding: 0 4px;
+  margin: 0;
   box-sizing: border-box;
   border-radius: 9px;
   display: grid;
   place-items: center;
-  font-size: 10px;
-  font-weight: 750;
-  line-height: 1;
+  font: 750 10px/1 inherit;
+  font-family: inherit;
   color: #fff;
-  border: 1.5px solid var(--bg-solid, #fff);
+  border: 1.5px solid var(--bg-solid);
   font-variant-numeric: tabular-nums;
-  pointer-events: none;
-  animation: badge-pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  cursor: pointer;
+  isolation: isolate;
+  animation: badge-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.busy:hover {
+  transform: scale(1.12);
+}
+.busy.on {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--glow) 35%, transparent);
 }
 .busy.claude {
   left: 5px;
@@ -597,17 +614,39 @@ input {
   background: var(--openai);
   --glow: var(--openai);
 }
+/* Two rings expand from behind the badge, half a cycle apart. Each starts
+   and ends fully transparent, so the loop never pops. */
+.busy::before,
 .busy::after {
   content: "";
   position: absolute;
   inset: -1.5px;
+  z-index: -1;
   border-radius: inherit;
-  box-shadow: 0 0 0 0 var(--glow);
-  animation: badge-ping 1.8s ease-out infinite;
+  background: var(--glow);
+  opacity: 0;
+  animation: badge-ripple 2.6s cubic-bezier(0.22, 0.61, 0.36, 1) infinite;
+  will-change: transform, opacity;
+}
+.busy::after {
+  animation-delay: 1.3s;
+}
+@keyframes badge-ripple {
+  0% {
+    transform: scale(1);
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.32;
+  }
+  100% {
+    transform: scale(2.1);
+    opacity: 0;
+  }
 }
 @keyframes badge-pop {
   from {
-    transform: scale(0.3);
+    transform: scale(0.4);
     opacity: 0;
   }
   to {
@@ -615,19 +654,215 @@ input {
     opacity: 1;
   }
 }
-@keyframes badge-ping {
-  0% {
-    box-shadow: 0 0 0 0 var(--glow);
-    opacity: 0.7;
+
+/* task list bubbles beside the ball */
+.bubble {
+  position: relative;
+  flex: none;
+  width: 192px;
+  box-sizing: border-box;
+  margin: 4px 0;
+  padding: 9px 8px 4px;
+  border-radius: 14px;
+  background: var(--bg-solid);
+  border: 1px solid var(--border);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.16), 0 1px 3px rgba(0, 0, 0, 0.08);
+  --side: var(--claude);
+  animation: bubble-in 0.38s cubic-bezier(0.34, 1.4, 0.64, 1) both;
+}
+.bubble.claude {
+  margin-right: 12px;
+  transform-origin: calc(100% + 10px) 18px;
+}
+.bubble.openai {
+  margin-left: 12px;
+  --side: var(--openai);
+  transform-origin: -10px 18px;
+}
+.bubble.closing {
+  animation: bubble-out 0.18s ease-in both;
+}
+@keyframes bubble-in {
+  from {
+    transform: scale(0.6);
+    opacity: 0;
   }
-  100% {
-    box-shadow: 0 0 0 6px var(--glow);
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+@keyframes bubble-out {
+  to {
+    transform: scale(0.6);
     opacity: 0;
   }
 }
+.bubble .tail {
+  position: absolute;
+  top: 12px;
+  width: 10px;
+  height: 10px;
+  background: var(--bg-solid);
+  border: 1px solid var(--border);
+  transform: rotate(45deg);
+}
+.bubble.claude .tail {
+  right: -6px;
+  border-left: 0;
+  border-bottom: 0;
+}
+.bubble.openai .tail {
+  left: -6px;
+  border-right: 0;
+  border-top: 0;
+}
+.bhead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 4px 6px;
+}
+.bname {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--side);
+}
+.bcount {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--side);
+  background: color-mix(in srgb, var(--side) 13%, transparent);
+  padding: 2px 7px;
+  border-radius: 8px;
+  font-variant-numeric: tabular-nums;
+}
+.tasks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 252px;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.tasks::-webkit-scrollbar {
+  display: none;
+}
+.task {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 7px 6px;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--side) 6%, transparent);
+  animation: task-in 0.36s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+.task + .task {
+  margin-top: 4px;
+}
+@keyframes task-in {
+  from {
+    transform: translateY(6px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+/* "working" equalizer: three bars breathing out of phase */
+.eq {
+  flex: none;
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  width: 12px;
+  height: 12px;
+  margin-top: 2px;
+}
+.eq i {
+  flex: 1;
+  height: 100%;
+  border-radius: 1.5px;
+  background: var(--side);
+  transform-origin: bottom;
+  animation: eq 1.1s ease-in-out infinite;
+}
+.eq i:nth-child(2) {
+  animation-delay: -0.35s;
+}
+.eq i:nth-child(3) {
+  animation-delay: -0.7s;
+}
+@keyframes eq {
+  0%,
+  100% {
+    transform: scaleY(0.3);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+.tbody {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ttitle {
+  font-size: 12px;
+  line-height: 1.35;
+  font-weight: 550;
+  color: var(--text);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+}
+.ttime {
+  font-size: 10.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.bfold {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 100%;
+  margin-top: 4px;
+  padding: 5px 0 4px;
+  border: 0;
+  border-top: 1px solid var(--border);
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 10.5px;
+  cursor: pointer;
+  border-radius: 0 0 10px 10px;
+  transition: color 0.15s ease;
+}
+.bfold:hover {
+  color: var(--side);
+}
+.bfold svg {
+  transition: transform 0.2s ease;
+}
+.bfold:hover svg {
+  transform: translateY(-1px);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .busy,
-  .busy::after {
+  .busy::before,
+  .busy::after,
+  .bubble,
+  .task,
+  .eq i {
     animation: none;
   }
 }

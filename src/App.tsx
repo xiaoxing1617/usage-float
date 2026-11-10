@@ -52,6 +52,9 @@ interface Settings {
   claudeCli: boolean;
   /** Show running conversation counts on the floating ball. */
   ballActivity: boolean;
+  /** Task list bubbles beside the ball, remembered per side. */
+  ballListClaude: boolean;
+  ballListGpt: boolean;
   alwaysOnTop: boolean;
   showIp: boolean;
   netCheck: boolean;
@@ -78,6 +81,8 @@ function loadSettings(): Settings {
     claudeQuota: false,
     claudeCli: true,
     ballActivity: true,
+    ballListClaude: true,
+    ballListGpt: true,
     alwaysOnTop: true,
     showIp: true,
     netCheck: true,
@@ -273,7 +278,8 @@ export default function App() {
     if (isTauri()) getCurrentWindow().setAlwaysOnTop(s.alwaysOnTop).catch(() => {});
   }, [s.alwaysOnTop]);
   useEffect(() => {
-    if (!isTauri()) return;
+    // The ball sizes itself (it grows when task bubbles are open).
+    if (!isTauri() || s.mode === "ball") return;
     const [width, height] = SIZES[s.mode];
     invoke("resize_on_screen", { width, height }).catch(() => {});
   }, [s.mode]);
@@ -366,6 +372,8 @@ export default function App() {
         claude={claudeWindows}
         gpt={report?.codex?.windows ?? []}
         activity={activity}
+        open={{ claude: s.ballListClaude, openai: s.ballListGpt }}
+        onToggle={(side, v) => update(side === "claude" ? { ballListClaude: v } : { ballListGpt: v })}
         now={now}
         onOpen={() => setMode("full")}
       />
@@ -839,11 +847,26 @@ const lvl = (p: number | null) => (p == null ? "" : p <= 10 ? "crit" : p <= 30 ?
  * Each half: "5h" caption, big 5-hour remaining %, weekly remaining underneath.
  * The ring halves fill from the bottom by the 5-hour remaining.
  */
-function Ball(props: { t: Dict; claude: QuotaWindow[]; gpt: QuotaWindow[]; activity: Activity | null; now: number; onOpen: () => void }) {
-  const { t, claude, gpt, activity, now, onOpen } = props;
+const BALL = 108;
+/** Bubble width plus the gap to the ball. */
+const BUBBLE_W = 204;
+
+type Side = "claude" | "openai";
+
+function Ball(props: {
+  t: Dict;
+  claude: QuotaWindow[];
+  gpt: QuotaWindow[];
+  activity: Activity | null;
+  now: number;
+  open: Record<Side, boolean>;
+  onToggle: (side: Side, open: boolean) => void;
+  onOpen: () => void;
+}) {
+  const { t, claude, gpt, activity, now, open, onToggle, onOpen } = props;
   const sides = [
-    { id: "claude" as const, name: "Claude", h5: leftFor(claude, "five_hour", now), wk: leftFor(claude, "seven_day", now), busy: activity?.claude ?? 0 },
-    { id: "openai" as const, name: "GPT", h5: leftFor(gpt, "five_hour", now), wk: leftFor(gpt, "seven_day", now), busy: activity?.codex ?? 0 },
+    { id: "claude" as const, name: "Claude", h5: leftFor(claude, "five_hour", now), wk: leftFor(claude, "seven_day", now), busy: activity?.claude ?? 0, tasks: activity?.claude_tasks ?? [] },
+    { id: "openai" as const, name: "GPT", h5: leftFor(gpt, "five_hour", now), wk: leftFor(gpt, "seven_day", now), busy: activity?.codex ?? 0, tasks: activity?.codex_tasks ?? [] },
   ];
 
   // Click opens the panel; dragging past a few pixels moves the window instead.
@@ -867,6 +890,44 @@ function Ball(props: { t: Dict; claude: QuotaWindow[]; gpt: QuotaWindow[]; activ
     start.current = null;
   };
 
+  // Bubbles: shown when that side has running tasks and the user left it open.
+  // `closing` plays the collapse animation before the bubble is removed.
+  const [closing, setClosing] = useState<Side | null>(null);
+  const shown = (id: Side, busy: number) => busy > 0 && open[id];
+  const collapse = (id: Side) => {
+    setClosing(id);
+    window.setTimeout(() => {
+      onToggle(id, false);
+      setClosing(null);
+    }, 180);
+  };
+  const left = shown("claude", sides[0].busy);
+  const right = shown("openai", sides[1].busy);
+
+  // Grow the window around the ball so the ball itself stays where it is.
+  const stage = useRef<HTMLDivElement>(null);
+  const [contentH, setContentH] = useState(BALL);
+  useEffect(() => {
+    const el = stage.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setContentH(Math.ceil(el.scrollHeight)));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const applied = useRef<number | null>(null); // left offset of the ball currently applied
+  useEffect(() => {
+    if (!isTauri()) return;
+    const offset = left ? BUBBLE_W : 0;
+    const width = BALL + offset + (right ? BUBBLE_W : 0);
+    const height = Math.max(BALL, contentH);
+    if (applied.current == null) {
+      invoke("resize_on_screen", { width, height }).catch(() => {});
+    } else {
+      invoke("resize_shift", { width, height, dx: applied.current - offset }).catch(() => {});
+    }
+    applied.current = offset;
+  }, [left, right, contentH]);
+
   // Two concentric half rings per side, from 6 o'clock up to 12 o'clock:
   // outer (thick) = 5-hour remaining, inner (thin) = weekly remaining.
   const S = 100;
@@ -875,8 +936,8 @@ function Ball(props: { t: Dict; claude: QuotaWindow[]; gpt: QuotaWindow[]; activ
     { key: "h5" as const, r: 46, cls: "ring" },
     { key: "wk" as const, r: 40, cls: "ring wkring" },
   ];
-  const arc = (r: number, left: boolean) =>
-    `M ${C} ${C + r} A ${r} ${r} 0 0 ${left ? 1 : 0} ${C} ${C - r}`;
+  const arc = (r: number, isLeft: boolean) =>
+    `M ${C} ${C + r} A ${r} ${r} 0 0 ${isLeft ? 1 : 0} ${C} ${C - r}`;
   const pctText = (p: number | null) => (p == null ? "—" : `${p}%`);
   const tip = [
     t.ballHint,
@@ -887,59 +948,135 @@ function Ball(props: { t: Dict; claude: QuotaWindow[]; gpt: QuotaWindow[]; activ
     ),
   ].join("\n");
 
+  const bubble = (x: (typeof sides)[number]) =>
+    shown(x.id, x.busy) ? (
+      <TaskBubble key={"bubble" + x.id} t={t} side={x.id} name={x.name} tasks={x.tasks} closing={closing === x.id} onCollapse={() => collapse(x.id)} />
+    ) : null;
+
   return (
-    <div className="ballwrap">
-      <div
-        className={"ball" + (sides.some((x) => x.busy) ? " active" : "")}
-        title={tip}
-        role="button"
-        aria-label={tip}
-        onMouseDown={onDown}
-        onMouseMove={onMove}
-        onMouseUp={onUp}
-        onMouseLeave={() => (start.current = null)}
-      >
-        <svg viewBox={`0 0 ${S} ${S}`} width={S} height={S} aria-hidden="true">
-          {sides.map((x, i) =>
-            rings.map((g) => {
-              const d = arc(g.r, i === 0);
-              const len = Math.PI * g.r;
-              const v = x[g.key];
-              return (
-                <g key={x.id + g.key} className={g.key === "wk" ? "wkg" : undefined}>
-                  <path d={d} className={g.key === "wk" ? "ring-track thin" : "ring-track"} />
-                  {v != null && v > 0 && (
-                    <path d={d} className={`${g.cls} ${x.id} ${lvl(v)}`} strokeDasharray={`${(len * v) / 100} ${len}`} />
-                  )}
-                </g>
-              );
-            }),
+    <div className="ballstage" ref={stage}>
+      {bubble(sides[0])}
+      <div className="ballwrap">
+        <div
+          className={"ball" + (sides.some((x) => x.busy) ? " active" : "")}
+          title={tip}
+          role="button"
+          aria-label={tip}
+          onMouseDown={onDown}
+          onMouseMove={onMove}
+          onMouseUp={onUp}
+          onMouseLeave={() => (start.current = null)}
+        >
+          <svg viewBox={`0 0 ${S} ${S}`} width={S} height={S} aria-hidden="true">
+            {sides.map((x, i) =>
+              rings.map((g) => {
+                const d = arc(g.r, i === 0);
+                const len = Math.PI * g.r;
+                const v = x[g.key];
+                return (
+                  <g key={x.id + g.key} className={g.key === "wk" ? "wkg" : undefined}>
+                    <path d={d} className={g.key === "wk" ? "ring-track thin" : "ring-track"} />
+                    {v != null && v > 0 && (
+                      <path d={d} className={`${g.cls} ${x.id} ${lvl(v)}`} strokeDasharray={`${(len * v) / 100} ${len}`} />
+                    )}
+                  </g>
+                );
+              }),
+            )}
+          </svg>
+          {sides.map((x) =>
+            x.busy > 0 ? (
+              <button
+                key={"badge" + x.id + x.busy}
+                className={`busy ${x.id}` + (shown(x.id, x.busy) ? " on" : "")}
+                title={shown(x.id, x.busy) ? t.taskCollapse : t.taskExpand}
+                onMouseDown={(e) => e.stopPropagation()}
+                onMouseUp={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (shown(x.id, x.busy)) collapse(x.id);
+                  else onToggle(x.id, true);
+                }}
+              >
+                {x.busy > 9 ? "9+" : x.busy}
+              </button>
+            ) : null,
           )}
-        </svg>
-        {sides.map((x) =>
-          x.busy > 0 ? (
-            <span key={"badge" + x.id + x.busy} className={`busy ${x.id}`} aria-hidden="true">
-              {x.busy > 9 ? "9+" : x.busy}
-            </span>
-          ) : null,
-        )}
-        <div className="halves">
-          {sides.map((x) => (
-            <div key={x.id} className={"half " + x.id}>
-              <span className="cap">5h</span>
-              <span className={"num " + lvl(x.h5)}>
-                {x.h5 == null ? "—" : x.h5}
-                {x.h5 != null && <small>%</small>}
-              </span>
-              <span className={"wk " + lvl(x.wk)}>
-                {t.ballWeek}
-                <b>{x.wk == null ? "—" : `${x.wk}%`}</b>
-              </span>
-            </div>
-          ))}
-          <span className="divider" />
+          <div className="halves">
+            {sides.map((x) => (
+              <div key={x.id} className={"half " + x.id}>
+                <span className="cap">5h</span>
+                <span className={"num " + lvl(x.h5)}>
+                  {x.h5 == null ? "—" : x.h5}
+                  {x.h5 != null && <small>%</small>}
+                </span>
+                <span className={"wk " + lvl(x.wk)}>
+                  {t.ballWeek}
+                  <b>{x.wk == null ? "—" : `${x.wk}%`}</b>
+                </span>
+              </div>
+            ))}
+            <span className="divider" />
+          </div>
         </div>
       </div>
+      {bubble(sides[1])}
+    </div>
+  );
+}
+
+/** "4:05", "1:02:09" — how long the current turn has been running. */
+function elapsed(ms: number): string {
+  const sec = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const ss = String(sec % 60).padStart(2, "0");
+  return h ? `${h}:${String(m).padStart(2, "0")}:${ss}` : `${m}:${ss}`;
+}
+
+function TaskBubble(props: {
+  t: Dict;
+  side: Side;
+  name: string;
+  tasks: Activity["claude_tasks"];
+  closing: boolean;
+  onCollapse: () => void;
+}) {
+  const { t, side, name, tasks, closing, onCollapse } = props;
+  // Ticks every second so the timers run smoothly.
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  return (
+    <div className={`bubble ${side}` + (closing ? " closing" : "")} role="dialog" aria-label={name}>
+      <span className="tail" aria-hidden="true" />
+      <div className="bhead">
+        <span className="bname">{name}</span>
+        <span className="bcount">{fmt(t.ballRunning, { n: tasks.length })}</span>
+      </div>
+      <ul className="tasks">
+        {tasks.map((task, i) => (
+          <li key={task.id} className="task" style={{ animationDelay: `${60 + i * 45}ms` }} title={task.title ?? t.taskUntitled}>
+            <span className="eq" aria-hidden="true">
+              <i />
+              <i />
+              <i />
+            </span>
+            <span className="tbody">
+              <span className="ttitle">{task.title ?? t.taskUntitled}</span>
+              {task.started_at != null && <span className="ttime">{elapsed(now - task.started_at)}</span>}
+            </span>
+          </li>
+        ))}
+      </ul>
+      <button className="bfold" onClick={onCollapse} title={t.taskCollapse} aria-label={t.taskCollapse}>
+        <svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true">
+          <path d="M3 7.5 6 4.5l3 3" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+        <span>{t.taskCollapse}</span>
+      </button>
     </div>
   );
 }

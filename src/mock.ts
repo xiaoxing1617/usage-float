@@ -86,7 +86,15 @@ export function mockInvoke(cmd: string, args?: Record<string, unknown>): Promise
         error: null,
       });
     case "get_activity":
-      return Promise.resolve({ claude: 2, codex: 1 });
+      return Promise.resolve({
+        claude: 2,
+        codex: 1,
+        claude_tasks: [
+          { id: "c1", title: "修复登录页在手机上的布局", started_at: Date.now() - 4 * 60_000 - 12_000 },
+          { id: "c2", title: "Write release notes for v2.4 and update the changelog", started_at: Date.now() - 47_000 },
+        ],
+        codex_tasks: [{ id: "x1", title: "优化首页间距适配响应式", started_at: Date.now() - 12 * 60_000 }],
+      });
     case "get_claude_quota":
       return Promise.resolve<QuotaResult>({
         windows: [

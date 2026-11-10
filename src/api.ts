@@ -92,9 +92,16 @@ export interface CliUsage {
 export const getClaudeCliUsage = (force: boolean) => invoke<CliUsage>("get_claude_cli_usage", { force });
 
 /** Conversations running right now in Claude Code / Codex on this Mac. */
+export interface RunningTask {
+  id: string;
+  title: string | null;
+  started_at: number | null; // unix ms
+}
 export interface Activity {
   claude: number;
   codex: number;
+  claude_tasks: RunningTask[];
+  codex_tasks: RunningTask[];
 }
 export const getActivity = () => invoke<Activity>("get_activity");
 export interface IpInfo {

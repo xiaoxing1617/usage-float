@@ -258,6 +258,27 @@ fn resize_on_screen(window: tauri::WebviewWindow, width: f64, height: f64) -> Re
     place_on_screen(&window, (width * scale).round() as i32, (height * scale).round() as i32).map_err(|e| e.to_string())
 }
 
+/// Resizes the window and moves it `dx` logical px horizontally, so content
+/// (the floating ball) keeps its place on screen when bubbles open beside it.
+/// The result is kept inside the monitor's work area.
+#[tauri::command]
+fn resize_shift(window: tauri::WebviewWindow, width: f64, height: f64, dx: f64) -> Result<(), String> {
+    let e = |e: tauri::Error| e.to_string();
+    let scale = window.scale_factor().map_err(e)?;
+    let (w, h) = ((width * scale).round() as i32, (height * scale).round() as i32);
+    let pos = window.outer_position().map_err(e)?;
+    let (mut x, mut y) = (pos.x + (dx * scale).round() as i32, pos.y);
+    if let Some(m) = window.current_monitor().map_err(e)?.or(window.primary_monitor().map_err(e)?) {
+        let a = m.work_area();
+        let (ax, ay, aw, ah) = (a.position.x, a.position.y, a.size.width as i32, a.size.height as i32);
+        x = x.clamp(ax, (ax + aw - w).max(ax));
+        y = y.clamp(ay, (ay + ah - h).max(ay));
+    }
+    window.set_size(tauri::PhysicalSize::new(w as u32, h as u32)).map_err(e)?;
+    window.set_position(tauri::PhysicalPosition::new(x, y)).map_err(e)?;
+    Ok(())
+}
+
 /// Points Claude Code's status line at our bridge script (user clicked Connect).
 #[tauri::command]
 fn connect_statusline() -> Result<statusline::StatuslineState, String> {
@@ -327,7 +348,7 @@ pub fn run() {
                 .build(app)?;
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![get_usage, refresh_prices, get_claude_quota, resize_on_screen, connect_statusline, disconnect_statusline, get_public_ip, check_network, open_site, close_site, get_claude_cli_usage, get_activity])
+        .invoke_handler(tauri::generate_handler![get_usage, refresh_prices, get_claude_quota, resize_on_screen, connect_statusline, disconnect_statusline, get_public_ip, check_network, open_site, close_site, get_claude_cli_usage, get_activity, resize_shift])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
