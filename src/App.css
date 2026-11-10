@@ -830,7 +830,7 @@ input {
 .task.done .tstate svg path {
   fill: none;
   stroke: #fff;
-  stroke-width: 1.7;
+  stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
 }

@@ -1285,9 +1285,9 @@ function TaskBubble(props: {
                       <i />
                     </span>
                   ) : (
-                    <svg viewBox="0 0 14 14" width="13" height="13">
-                      <circle cx="7" cy="7" r="6.2" />
-                      <path d="M4.3 7.2 6.2 9l3.5-3.8" />
+                    <svg viewBox="0 0 20 20" width="20" height="20">
+                      <circle cx="10" cy="10" r="10" />
+                      <path d="M6 10.3 8.7 13l5.3-5.6" />
                     </svg>
                   )}
                 </span>
