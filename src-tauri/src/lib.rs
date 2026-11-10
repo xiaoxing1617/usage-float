@@ -1,4 +1,6 @@
+mod activity;
 mod claude;
+mod cli_usage;
 mod drawer;
 mod ip;
 mod pricing;
@@ -25,6 +27,7 @@ struct AppState {
     prices_path: PathBuf,
     claude_quota: Mutex<claude::QuotaCache>,
     trust: trust::ScoreCache,
+    cli_usage: cli_usage::CliCache,
 }
 
 #[derive(Serialize)]
@@ -183,6 +186,18 @@ async fn get_claude_quota(state: State<'_, AppState>, force: bool) -> Result<cla
     Ok(claude::fetch_quota(&state.claude_quota, force).await)
 }
 
+/// Claude quota from Claude Code's own `/usage` command (no chat, no tokens).
+#[tauri::command]
+async fn get_claude_cli_usage(state: State<'_, AppState>, force: bool) -> Result<cli_usage::CliUsage, String> {
+    Ok(cli_usage::fetch(&state.cli_usage, force).await)
+}
+
+/// Number of Claude Code / Codex conversations running right now.
+#[tauri::command]
+async fn get_activity() -> activity::Activity {
+    tauri::async_runtime::spawn_blocking(activity::scan).await.unwrap_or_default()
+}
+
 /// Resizes the window to `width` x `height` (physical px) and keeps it fully
 /// inside the monitor's work area. When the window sits in the right / bottom
 /// half of the screen it grows toward the left / top, so expanding a ball parked
@@ -287,6 +302,7 @@ pub fn run() {
                 prices_path,
                 claude_quota: Mutex::new(claude::QuotaCache::new(data_dir.join("claude_quota.json"))),
                 trust: trust::ScoreCache::default(),
+                cli_usage: cli_usage::CliCache::new(data_dir.join("claude_cli_usage.json")),
             });
 
             let toggle = MenuItem::with_id(app, "toggle", "Show / Hide", true, None::<&str>)?;
@@ -311,7 +327,7 @@ pub fn run() {
                 .build(app)?;
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![get_usage, refresh_prices, get_claude_quota, resize_on_screen, connect_statusline, disconnect_statusline, get_public_ip, check_network, open_site, close_site])
+        .invoke_handler(tauri::generate_handler![get_usage, refresh_prices, get_claude_quota, resize_on_screen, connect_statusline, disconnect_statusline, get_public_ip, check_network, open_site, close_site, get_claude_cli_usage, get_activity])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

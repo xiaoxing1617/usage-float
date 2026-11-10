@@ -9,6 +9,10 @@ import {
   disconnectStatusline,
   effectiveClaudeWindows,
   getClaudeQuota,
+  getClaudeCliUsage,
+  getActivity,
+  type Activity,
+  type CliUsage,
   getPublicIp,
   toTraditional,
   showRegion,
@@ -44,6 +48,10 @@ interface Settings {
   currency: Currency;
   autoPrices: boolean;
   claudeQuota: boolean;
+  /** Read the Claude quota with Claude Code's `/usage` command. */
+  claudeCli: boolean;
+  /** Show running conversation counts on the floating ball. */
+  ballActivity: boolean;
   alwaysOnTop: boolean;
   showIp: boolean;
   netCheck: boolean;
@@ -68,6 +76,8 @@ function loadSettings(): Settings {
     currency: "USD",
     autoPrices: false,
     claudeQuota: false,
+    claudeCli: true,
+    ballActivity: true,
     alwaysOnTop: true,
     showIp: true,
     netCheck: true,
@@ -143,6 +153,9 @@ export default function App() {
   const [pricesBusy, setPricesBusy] = useState(false);
   const [claudeQuota, setClaudeQuota] = useState<QuotaResult | null>(null);
   const [claudeBusy, setClaudeBusy] = useState(false);
+  const [cli, setCli] = useState<CliUsage | null>(null);
+  const [cliBusy, setCliBusy] = useState(false);
+  const [activity, setActivity] = useState<Activity | null>(null);
   const [slBusy, setSlBusy] = useState(false);
   const [slError, setSlError] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
@@ -214,6 +227,40 @@ export default function App() {
     loadClaudeQuota(false);
     return () => window.clearTimeout(claudeTimer.current);
   }, [s.claudeQuota, loadClaudeQuota]);
+
+  // Claude quota from Claude Code's `/usage` (no chat, no tokens). Every 10 min.
+  const loadCli = useCallback(async (force: boolean) => {
+    setCliBusy(true);
+    try {
+      setCli(await getClaudeCliUsage(force));
+    } catch (e) {
+      setCli((prev) => ({ windows: prev?.windows ?? [], fetched_at: prev?.fetched_at ?? null, error: String(e) }));
+    } finally {
+      setCliBusy(false);
+    }
+  }, []);
+  useEffect(() => {
+    if (!s.claudeCli) {
+      setCli(null);
+      return;
+    }
+    loadCli(false);
+    const id = setInterval(() => loadCli(false), CLAUDE_POLL_MS);
+    return () => clearInterval(id);
+  }, [s.claudeCli, loadCli]);
+
+  // Running conversations: only needed while the ball is showing.
+  const showActivity = s.mode === "ball" && s.ballActivity;
+  useEffect(() => {
+    if (!showActivity) {
+      setActivity(null);
+      return;
+    }
+    const tick = () => getActivity().then(setActivity).catch(() => {});
+    tick();
+    const id = setInterval(tick, 4_000);
+    return () => clearInterval(id);
+  }, [showActivity]);
 
   // Clock for countdowns.
   useEffect(() => {
@@ -287,11 +334,12 @@ export default function App() {
 
   const refreshAll = () => {
     loadUsage();
+    if (s.claudeCli) loadCli(true);
     if (s.showIp) loadIp();
     if (s.netCheck) (["claude", "openai"] as const).forEach((p) => runNet(p, false));
   };
 
-  const claudeView = effectiveClaudeWindows(claudeQuota, report?.claude_statusline, report?.claude_hits ?? [], now);
+  const claudeView = effectiveClaudeWindows(claudeQuota, report?.claude_statusline, cli, report?.claude_hits ?? [], now);
   const claudeWindows = claudeView.windows;
   const setStatusline = async (connect: boolean) => {
     setSlBusy(true);
@@ -317,6 +365,7 @@ export default function App() {
         t={t}
         claude={claudeWindows}
         gpt={report?.codex?.windows ?? []}
+        activity={activity}
         now={now}
         onOpen={() => setMode("full")}
       />
@@ -422,6 +471,10 @@ export default function App() {
                 sl={report?.claude_statusline ?? null}
                 endpointOn={s.claudeQuota}
                 quota={claudeQuota}
+                cli={cli}
+                cliOn={s.claudeCli}
+                cliBusy={cliBusy}
+                onCliRetry={() => loadCli(true)}
                 busy={claudeBusy}
                 slBusy={slBusy}
                 slError={slError}
@@ -468,7 +521,11 @@ function quotaError(code: string, t: Dict): string {
 
 function windowLabel(key: string, t: Dict) {
   const k = ("win_" + key) as keyof Dict;
-  return k in t ? t[k] : t.win_other;
+  if (k in t) return t[k];
+  // Model-specific weekly windows from /usage, e.g. "seven_day_fable" → "Weekly · Fable".
+  const m = key.match(/^seven_day_(.+)$/);
+  if (m) return `${t.win_seven_day} · ${m[1].replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}`;
+  return t.win_other;
 }
 
 function QuotaBar({ w, t, now }: { w: QuotaWindow; t: Dict; now: number }) {
@@ -693,6 +750,10 @@ function ClaudeSources(props: {
   sl: StatuslineState | null;
   endpointOn: boolean;
   quota: QuotaResult | null;
+  cli: CliUsage | null;
+  cliOn: boolean;
+  cliBusy: boolean;
+  onCliRetry: () => void;
   busy: boolean;
   slBusy: boolean;
   slError: string | null;
@@ -700,10 +761,12 @@ function ClaudeSources(props: {
   onConnect: () => void;
   onUseEndpoint: () => void;
 }) {
-  const { t, now, view, sl, endpointOn, quota, busy, slBusy, slError, onRetry, onConnect, onUseEndpoint } = props;
+  const { t, now, view, sl, endpointOn, quota, cli, cliOn, cliBusy, onCliRetry, busy, slBusy, slError, onRetry, onConnect, onUseEndpoint } = props;
   const ago = (ms: number | null) => duration(now - (ms ?? now), t);
   const source =
-    view.source === "statusline"
+    view.source === "cli"
+      ? fmt(t.cliFrom, { t: ago(view.at) })
+      : view.source === "statusline"
       ? fmt(t.slFrom, { t: ago(view.at) })
       : view.source === "api"
         ? fmt(t.apiFrom, { t: ago(view.at) })
@@ -711,12 +774,22 @@ function ClaudeSources(props: {
           ? t.logsFrom
           : null;
   // Endpoint errors only matter when the endpoint is the best source we have.
-  const showApiError = endpointOn && quota?.error && view.source !== "statusline";
+  const showApiError = endpointOn && quota?.error && !view.source;
+  const showCliError = cliOn && cli?.error && view.source !== "cli";
   const connected = sl?.connected ?? false;
   return (
     <>
       {source && <div className="muted tiny">{source}</div>}
-      {connected && !sl?.windows.length && <div className="muted tiny">{t.slWaiting}</div>}
+      {connected && !sl?.windows.length && view.source !== "cli" && <div className="muted tiny">{t.slWaiting}</div>}
+      {cliOn && cliBusy && !view.source && <div className="muted tiny">{t.cliLoading}</div>}
+      {showCliError && (
+        <div className="qerr">
+          <div className="warn tiny">{cliError(cli!.error!, t)}</div>
+          <button className="link tiny" disabled={cliBusy} onClick={onCliRetry}>
+            {cliBusy ? "…" : t.retry}
+          </button>
+        </div>
+      )}
       {showApiError && (
         <div className="qerr">
           <div className="warn small">{quotaError(quota!.error!, t)}</div>
@@ -726,7 +799,7 @@ function ClaudeSources(props: {
           </button>
         </div>
       )}
-      {!connected && (
+      {!connected && (!view.source || view.source === "logs") && !(cliOn && cliBusy) && (
         <div className="qerr">
           {!endpointOn && !view.source && <div className="muted small">{t.claudeQuotaOff}</div>}
           <button className="btn primary" disabled={slBusy} title={t.slHint} onClick={onConnect}>
@@ -742,6 +815,11 @@ function ClaudeSources(props: {
       {slError && <div className="warn tiny">{fmt(t.slError, { e: slError })}</div>}
     </>
   );
+}
+
+function cliError(code: string, t: Dict): string {
+  const k = ("cliErr_" + code) as keyof Dict;
+  return k in t ? t[k] : fmt(t.cliErr_other, { e: code });
 }
 
 // ---------- floating ball ----------
@@ -761,11 +839,11 @@ const lvl = (p: number | null) => (p == null ? "" : p <= 10 ? "crit" : p <= 30 ?
  * Each half: "5h" caption, big 5-hour remaining %, weekly remaining underneath.
  * The ring halves fill from the bottom by the 5-hour remaining.
  */
-function Ball(props: { t: Dict; claude: QuotaWindow[]; gpt: QuotaWindow[]; now: number; onOpen: () => void }) {
-  const { t, claude, gpt, now, onOpen } = props;
+function Ball(props: { t: Dict; claude: QuotaWindow[]; gpt: QuotaWindow[]; activity: Activity | null; now: number; onOpen: () => void }) {
+  const { t, claude, gpt, activity, now, onOpen } = props;
   const sides = [
-    { id: "claude" as const, name: "Claude", h5: leftFor(claude, "five_hour", now), wk: leftFor(claude, "seven_day", now) },
-    { id: "openai" as const, name: "GPT", h5: leftFor(gpt, "five_hour", now), wk: leftFor(gpt, "seven_day", now) },
+    { id: "claude" as const, name: "Claude", h5: leftFor(claude, "five_hour", now), wk: leftFor(claude, "seven_day", now), busy: activity?.claude ?? 0 },
+    { id: "openai" as const, name: "GPT", h5: leftFor(gpt, "five_hour", now), wk: leftFor(gpt, "seven_day", now), busy: activity?.codex ?? 0 },
   ];
 
   // Click opens the panel; dragging past a few pixels moves the window instead.
@@ -802,13 +880,17 @@ function Ball(props: { t: Dict; claude: QuotaWindow[]; gpt: QuotaWindow[]; now: 
   const pctText = (p: number | null) => (p == null ? "—" : `${p}%`);
   const tip = [
     t.ballHint,
-    ...sides.map((x) => `${x.name}: 5h ${pctText(x.h5)} · ${t.win_seven_day} ${pctText(x.wk)}`),
+    ...sides.map(
+      (x) =>
+        `${x.name}: 5h ${pctText(x.h5)} · ${t.win_seven_day} ${pctText(x.wk)}` +
+        (x.busy ? ` · ${fmt(t.ballRunning, { n: x.busy })}` : ""),
+    ),
   ].join("\n");
 
   return (
     <div className="ballwrap">
       <div
-        className="ball"
+        className={"ball" + (sides.some((x) => x.busy) ? " active" : "")}
         title={tip}
         role="button"
         aria-label={tip}
@@ -834,6 +916,13 @@ function Ball(props: { t: Dict; claude: QuotaWindow[]; gpt: QuotaWindow[]; now: 
             }),
           )}
         </svg>
+        {sides.map((x) =>
+          x.busy > 0 ? (
+            <span key={"badge" + x.id + x.busy} className={`busy ${x.id}`} aria-hidden="true">
+              {x.busy > 9 ? "9+" : x.busy}
+            </span>
+          ) : null,
+        )}
         <div className="halves">
           {sides.map((x) => (
             <div key={x.id} className={"half " + x.id}>
@@ -1106,6 +1195,8 @@ function SettingsView(props: {
         <Toggle label={t.showIp} on={s.showIp} onChange={(v) => update({ showIp: v })} />
         <Toggle label={t.netCheck} on={s.netCheck} onChange={(v) => update({ netCheck: v })} />
         <div className="muted tiny">{t.netCheckHint}</div>
+        <Toggle label={t.ballActivity} on={s.ballActivity} onChange={(v) => update({ ballActivity: v })} />
+        <div className="muted tiny">{t.ballActivityHint}</div>
       </section>
 
       <section className="card">
@@ -1126,6 +1217,11 @@ function SettingsView(props: {
             </button>
           </div>
         )}
+      </section>
+
+      <section className="card">
+        <Toggle label={t.cliTitle} on={s.claudeCli} onChange={(v) => update({ claudeCli: v })} />
+        <div className="muted tiny">{t.cliHint}</div>
       </section>
 
       <section className="card">

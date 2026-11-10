@@ -75,6 +75,18 @@ export function mockInvoke(cmd: string, args?: Record<string, unknown>): Promise
           ? { service: "claude", ip: "203.0.113.42", country: "SG", latency_ms: 324, trust_score: 94, restricted: false, ip_kind: "residential", checked_at: Date.now(), error: null }
           : { service: "openai", ip: "203.0.113.42", country: "SG", latency_ms: 612, trust_score: 41, restricted: false, ip_kind: "datacenter", checked_at: Date.now(), error: null },
       );
+    case "get_claude_cli_usage":
+      return Promise.resolve({
+        windows: [
+          { key: "five_hour", used_percent: 38, resets_at: t + 7200, window_minutes: 300 },
+          { key: "seven_day", used_percent: 52, resets_at: t + 3 * 86400, window_minutes: 10080 },
+          { key: "seven_day_fable", used_percent: 12, resets_at: t + 3 * 86400, window_minutes: 10080 },
+        ],
+        fetched_at: Date.now() - 3 * 60_000,
+        error: null,
+      });
+    case "get_activity":
+      return Promise.resolve({ claude: 2, codex: 1 });
     case "get_claude_quota":
       return Promise.resolve<QuotaResult>({
         windows: [

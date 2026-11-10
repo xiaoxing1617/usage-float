@@ -31,7 +31,7 @@ A small floating widget for your Mac desktop that keeps your **Claude** and **GP
 - **Usage stats**: today, yesterday, this week, last week, this month, last month, last 7 days, last 30 days, or a custom range; broken down by model and by day.
 - **Cost estimate (optional)**: with "Fetch model prices automatically" on, prices are refreshed every 12 hours from the [LiteLLM price table](https://github.com/BerriAI/litellm). Every price change is kept, and each usage event is priced at the rate **in effect at that time** (if a model cost $5 yesterday and $3 today, each day is priced separately). With it off, no cost is shown.
 - **Currencies**: USD, CNY, JPY, SGD, EUR, with ECB rates from [Frankfurter](https://frankfurter.dev).
-- **Floating ball**: shrink to a small ball, Claude on the left and GPT on the right; the outer ring is the 5-hour quota, the inner ring the weekly quota. Click to expand, drag to move.
+- **Floating ball**: shrink to a small ball, Claude on the left and GPT on the right; the outer ring is the 5-hour quota, the inner ring the weekly quota. Click to expand, drag to move. While a conversation is running, a badge shows how many Claude Code / Codex conversations are in progress, with a soft ripple.
 - **Public IP**: the egress IP websites see, with country and state/province (in the UI language).
 - **IP trust score & latency**: a 🛡 score (0–100, red to green) and latency in ms next to the Claude and GPT names. Click the score for the full IP check; click the latency to see how it is measured.
 - **Three languages**: English, 简体中文, 繁體中文. Picked from the system language on first launch, falling back to English; change it in Settings.
@@ -108,13 +108,19 @@ The app isn't signed with an Apple Developer ID, so macOS blocks it the first ti
 - **Top right**: `↻ Refresh`, `⚙ Settings`, `● Ball`.
 - **Start at login**: add Usage Float under **System Settings → General → Login Items**.
 
-### Getting the Claude quota (important)
+### Where the Claude quota comes from
 
-The GPT quota is read straight from the Codex logs. **The Claude quota needs the Claude Code status line**:
+The GPT quota is read straight from the Codex logs. By default, the Claude quota comes from:
+
+**`/usage` (on by default, recommended)**: every 10 minutes the widget runs Claude Code's own `/usage` command in the background (`claude -p "/usage" --no-session-persistence`) and reads the 5-hour, weekly and per-model quota. It is a local command: **no chat, no tokens, no cost**, and nothing is added to your session history. It only needs the Claude Code CLI installed and signed in on this Mac.
+
+If `/usage` doesn't work for you, you can connect the Claude Code status line instead:
 
 1. In the widget, open **Settings → Claude Code status line (recommended) → Connect Claude Code status line**. This points the status line in `~/.claude/settings.json` at a small script (the file is backed up first, and any status line you already had keeps showing).
 2. Use Claude Code once in Terminal (run `claude` and send a message).
 3. The widget now shows the 5-hour and weekly quota "from the Claude Code status line". It updates whenever you use Claude Code in a terminal or IDE.
+
+With several sources, the widget uses whichever is newest.
 
 > The Claude desktop app and claude.ai don't run the status line; only Claude Code in a terminal or IDE does.
 > Settings also has an optional "Claude remaining quota (unofficial)" switch that reads your sign-in from the Keychain and calls an unofficial endpoint. It is often rate-limited, so you usually don't need it.
@@ -137,6 +143,7 @@ The widget only connects to these addresses, and all of them except exchange rat
 | Exchange rates | api.frankfurter.dev | nothing |
 | Public IP and location (optional) | Cloudflare `cdn-cgi/trace`, api.ipify.org, ipwho.is | your public IP (which they see anyway) |
 | Trust score and latency (optional) | `cdn-cgi/trace` on claude.ai and chatgpt.com, ip.net.coffee | your public IP |
+| Claude quota (`/usage`, optional) | Claude Code itself contacts Anthropic | the widget sends nothing and never reads the sign-in token |
 | Claude quota endpoint (off by default) | api.anthropic.com | Claude Code's sign-in token, sent only to Anthropic |
 
 Files it writes on your Mac:
@@ -144,6 +151,8 @@ Files it writes on your Mac:
 - `~/.claude/settings.json` (only when you connect the status line; backed up first to `settings.json.usage-float.bak`)
 - `~/.claude/usage-float/` (the status line script and the latest quota data)
 - `~/Library/Application Support/com.usagefloat.app/` (price history, cache)
+
+The running-conversation count only reads the end of log files in `~/.claude/projects` and `~/.codex/sessions` written in the last few minutes, to tell whether a conversation has finished. Nothing is uploaded.
 
 ## Uninstall
 

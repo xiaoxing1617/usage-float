@@ -1,5 +1,6 @@
 :root {
   --bg: rgba(250, 250, 252, 0.86);
+  --bg-solid: #fafafc;
   --card: rgba(255, 255, 255, 0.72);
   --border: rgba(0, 0, 0, 0.08);
   --text: #1c1c1f;
@@ -21,6 +22,7 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: rgba(28, 28, 32, 0.84);
+    --bg-solid: #1c1c20;
     --card: rgba(255, 255, 255, 0.06);
     --border: rgba(255, 255, 255, 0.09);
     --text: #ececf1;
@@ -35,6 +37,7 @@
 }
 :root[data-theme="dark"] {
   --bg: rgba(28, 28, 32, 0.84);
+  --bg-solid: #1c1c20;
   --card: rgba(255, 255, 255, 0.06);
   --border: rgba(255, 255, 255, 0.09);
   --text: #ececf1;
@@ -564,6 +567,71 @@ input {
   stroke: var(--crit);
   opacity: 1;
 }
+/* running conversations: a count badge with a soft ripple */
+.busy {
+  position: absolute;
+  top: 5px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  box-sizing: border-box;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+  font-weight: 750;
+  line-height: 1;
+  color: #fff;
+  border: 1.5px solid var(--bg-solid, #fff);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  animation: badge-pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.busy.claude {
+  left: 5px;
+  background: var(--claude);
+  --glow: var(--claude);
+}
+.busy.openai {
+  right: 5px;
+  background: var(--openai);
+  --glow: var(--openai);
+}
+.busy::after {
+  content: "";
+  position: absolute;
+  inset: -1.5px;
+  border-radius: inherit;
+  box-shadow: 0 0 0 0 var(--glow);
+  animation: badge-ping 1.8s ease-out infinite;
+}
+@keyframes badge-pop {
+  from {
+    transform: scale(0.3);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+@keyframes badge-ping {
+  0% {
+    box-shadow: 0 0 0 0 var(--glow);
+    opacity: 0.7;
+  }
+  100% {
+    box-shadow: 0 0 0 6px var(--glow);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .busy,
+  .busy::after {
+    animation: none;
+  }
+}
+
 .halves {
   position: absolute;
   inset: 16px 11px;

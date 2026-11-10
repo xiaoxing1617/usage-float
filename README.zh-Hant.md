@@ -31,7 +31,7 @@
 - **用量統計**：今天、昨天、本週、上週、本月、上月、近 7 天、近 30 天、自訂日期；依模型、依天分別統計。
 - **費用估算（選用）**：開啟「自動取得模型價格」後，每 12 小時從 [LiteLLM 價格表](https://github.com/BerriAI/litellm) 更新一次。每次價格變動都會保留紀錄，每筆用量依**當時的價格**計算（例如某模型昨天 $5、今天 $3，會分開計算）。未開啟則不顯示費用。
 - **幣別換算**：美元、人民幣、日圓、新加坡幣、歐元，匯率來自歐洲央行（[Frankfurter](https://frankfurter.dev)）。
-- **懸浮球**：縮小成一顆圓球，左邊 Claude、右邊 GPT；外圈是 5 小時額度，內圈是週額度。點一下展開，按住可拖曳。
+- **懸浮球**：縮小成一顆圓球，左邊 Claude、右邊 GPT；外圈是 5 小時額度，內圈是週額度。點一下展開，按住可拖曳。有對話正在進行時，球上會出現數字角標（Claude Code／Codex 進行中的對話數量），帶輕微的波紋動畫。
 - **出口 IP**：顯示網站看到的公網出口 IP，以及國家和州／省（跟隨介面語言）。
 - **IP 信任評分與延遲**：在 Claude、GPT 名稱後面顯示 🛡 評分（0–100，顏色由紅到綠）與延遲毫秒數。點評分開啟完整檢測頁，點毫秒數查看延遲是怎麼測的。
 - **三種語言**：繁體中文、简体中文、English。首次開啟時依系統語言自動選擇，其他語言預設為英文；可在設定中更改。
@@ -108,13 +108,19 @@
 - **右上角**：`↻ 重新整理`、`⚙ 設定`、`● 懸浮球`。
 - **開機自動啟動**：在「系統設定 → 一般 → 登入項目」中加入 Usage Float。
 
-### 讓 Claude 額度顯示出來（重要）
+### Claude 額度從哪裡來
 
-GPT 的額度會直接從 Codex 紀錄讀取。**Claude 的額度需要接上 Claude Code 的狀態列**：
+GPT 的額度會直接從 Codex 紀錄讀取。Claude 的額度預設這樣取得：
+
+**用 `/usage` 讀取（預設開啟，推薦）**：浮窗每 10 分鐘在背景執行一次 Claude Code 內建的 `/usage` 指令（`claude -p "/usage" --no-session-persistence`），讀出 5 小時、每週和依模型的額度。這是本機指令，**不聊天、不消耗 token、不花錢**，也不會在你的對話紀錄中留下紀錄。只需要這台 Mac 上已安裝並登入 Claude Code 命令列版。
+
+如果 `/usage` 無法使用，也可以接上 Claude Code 的狀態列：
 
 1. 開啟浮窗 **設定 → Claude Code 狀態列（推薦）→ 連接 Claude Code 狀態列**。浮窗會在 `~/.claude/settings.json` 設定一個狀態列腳本（會先備份原檔，原本的狀態列照常顯示）。
 2. 在終端機用一次 Claude Code（執行 `claude` 並傳一則訊息）。
 3. 浮窗就會顯示「來自 Claude Code 狀態列」的 5 小時與每週額度。之後每次在終端機或 IDE 使用 Claude Code 都會自動更新。
+
+有多個來源時，浮窗會自動使用最新的那一個。
 
 > Claude 桌面版和網頁版不會觸發狀態列，只有命令列／IDE 版的 Claude Code 會。
 > 設定中還有一個選用的「Claude 剩餘額度（非官方）」開關，會從鑰匙圈讀取登入資訊去呼叫非官方介面，常被限流，一般不需要開啟。
@@ -137,6 +143,7 @@ GPT 的額度會直接從 Codex 紀錄讀取。**Claude 的額度需要接上 Cl
 | 匯率 | api.frankfurter.dev | 無 |
 | 出口 IP 與位置（可關） | Cloudflare `cdn-cgi/trace`、api.ipify.org、ipwho.is | 你的公網 IP（對方本來就看得到） |
 | 信任評分與延遲（可關） | claude.ai、chatgpt.com 的 `cdn-cgi/trace`，ip.net.coffee | 你的公網 IP |
+| Claude 額度（`/usage`，可關） | 由 Claude Code 自己連線到 Anthropic | 浮窗本身不傳送任何內容，也不讀取登入權杖 |
 | Claude 額度介面（預設關閉） | api.anthropic.com | Claude Code 的登入權杖，只傳給 Anthropic 官方 |
 
 會寫入的本機檔案：
@@ -144,6 +151,8 @@ GPT 的額度會直接從 Codex 紀錄讀取。**Claude 的額度需要接上 Cl
 - `~/.claude/settings.json`（只在你點「連接狀態列」時修改，修改前備份為 `settings.json.usage-float.bak`）
 - `~/.claude/usage-float/`（狀態列腳本與最新額度資料）
 - `~/Library/Application Support/com.usagefloat.app/`（價格歷史、快取）
+
+「進行中的對話」只讀取 `~/.claude/projects` 和 `~/.codex/sessions` 中最近幾分鐘寫入的紀錄檔末尾，用來判斷對話是否結束，不會上傳任何內容。
 
 ## 解除安裝
 

@@ -82,6 +82,21 @@ export interface PriceStatus {
 export const getUsage = (withCost: boolean) => invoke<UsageReport>("get_usage", { withCost });
 export const refreshPrices = (force: boolean) => invoke<PriceStatus>("refresh_prices", { force });
 export const getClaudeQuota = (force: boolean) => invoke<QuotaResult>("get_claude_quota", { force });
+
+/** Claude quota from Claude Code's own `/usage` command. */
+export interface CliUsage {
+  windows: QuotaWindow[];
+  fetched_at: number | null; // unix ms
+  error: string | null;
+}
+export const getClaudeCliUsage = (force: boolean) => invoke<CliUsage>("get_claude_cli_usage", { force });
+
+/** Conversations running right now in Claude Code / Codex on this Mac. */
+export interface Activity {
+  claude: number;
+  codex: number;
+}
+export const getActivity = () => invoke<Activity>("get_activity");
 export interface IpInfo {
   ip: string | null;
   country: string | null;
@@ -164,7 +179,7 @@ export const disconnectStatusline = () => invoke<StatuslineState>("disconnect_st
 export interface ClaudeQuotaView {
   windows: QuotaWindow[];
   /** Where the windows came from, and when (unix ms). */
-  source: "statusline" | "api" | "logs" | null;
+  source: "statusline" | "cli" | "api" | "logs" | null;
   at: number | null;
 }
 
@@ -175,19 +190,22 @@ export interface ClaudeQuotaView {
 export function effectiveClaudeWindows(
   q: QuotaResult | null,
   sl: StatuslineState | null | undefined,
+  cli: CliUsage | null,
   hits: ClaudeLimitHit[],
   nowMs: number,
 ): ClaudeQuotaView {
-  // Use whichever source is fresher: the status line (official) or the endpoint.
-  const slAt = sl?.windows.length ? (sl.observed_at ?? 0) : -1;
-  const apiAt = q?.windows.length ? (q.fetched_at ?? 0) : -1;
+  // Use whichever source is freshest: /usage, the status line, or the endpoint.
+  const candidates: [NonNullable<ClaudeQuotaView["source"]>, number | null, QuotaWindow[]][] = [
+    ["cli", cli?.fetched_at ?? null, cli?.windows ?? []],
+    ["statusline", sl?.observed_at ?? null, sl?.windows ?? []],
+    ["api", q?.fetched_at ?? null, q?.windows ?? []],
+  ];
   let source: ClaudeQuotaView["source"] = null;
   let at: number | null = null;
   let base: QuotaWindow[] = [];
-  if (slAt >= 0 && slAt >= apiAt) {
-    [source, at, base] = ["statusline", sl!.observed_at, sl!.windows];
-  } else if (apiAt >= 0) {
-    [source, at, base] = ["api", q!.fetched_at, q!.windows];
+  for (const [src, t, ws] of candidates) {
+    if (!ws.length) continue;
+    if (source == null || (t ?? 0) > (at ?? 0)) [source, at, base] = [src, t, ws];
   }
   const out = base.map((w) => ({ ...w }));
   for (const h of hits) {

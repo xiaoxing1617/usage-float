@@ -7,6 +7,19 @@ export const LANGS: { id: Lang; label: string }[] = [
 ];
 
 const en = {
+  cliTitle: "Claude quota via /usage (recommended)",
+  cliHint: "Runs Claude Code's own /usage command in the background every 10 minutes. No chat, no tokens, no cost, and nothing is added to your session history. Needs Claude Code installed and signed in on this Mac.",
+  cliFrom: "From Claude Code /usage, {t} ago",
+  cliLoading: "Reading quota with Claude Code /usage…",
+  cliErr_not_installed: "Claude Code command line not found",
+  cliErr_not_signed_in: "Claude Code isn't signed in. Run claude in Terminal and sign in",
+  cliErr_no_subscription: "/usage only shows quota for Claude subscriptions",
+  cliErr_timeout: "Claude Code /usage took too long",
+  cliErr_parse_failed: "Couldn't read the /usage output (format changed?)",
+  cliErr_other: "/usage failed: {e}",
+  ballActivity: "Show running conversations on the ball",
+  ballActivityHint: "A badge shows how many Claude Code / Codex conversations are running on this Mac, read from their local logs. Chats on the web or in the apps aren't included.",
+  ballRunning: "{n} running",
   appName: "Usage Float",
   slConnect: "Connect Claude Code status line",
   slDisconnect: "Disconnect",
@@ -148,6 +161,19 @@ const en = {
 export type Dict = typeof en;
 
 const zhHans: Dict = {
+  cliTitle: "用 /usage 读取 Claude 额度（推荐）",
+  cliHint: "每 10 分钟在后台运行一次 Claude Code 自带的 /usage 命令。不聊天、不消耗 token、不花钱，也不会在你的会话历史里留下记录。需要这台 Mac 上装好并登录 Claude Code。",
+  cliFrom: "来自 Claude Code /usage，{t}前",
+  cliLoading: "正在用 Claude Code /usage 读取额度…",
+  cliErr_not_installed: "没有找到 Claude Code 命令行",
+  cliErr_not_signed_in: "Claude Code 还没登录，请在终端运行 claude 登录",
+  cliErr_no_subscription: "/usage 只显示 Claude 订阅的额度",
+  cliErr_timeout: "Claude Code /usage 超时",
+  cliErr_parse_failed: "读不懂 /usage 的输出（可能改了格式）",
+  cliErr_other: "/usage 失败：{e}",
+  ballActivity: "悬浮球显示正在进行的对话",
+  ballActivityHint: "用角标显示这台 Mac 上 Claude Code / Codex 正在进行的对话数量，从它们的本地记录判断。网页版和 App 里的对话不计入。",
+  ballRunning: "{n} 个进行中",
   appName: "AI 用量浮窗",
   slConnect: "连接 Claude Code 状态栏",
   slDisconnect: "断开",
@@ -283,6 +309,19 @@ const zhHans: Dict = {
 };
 
 const zhHant: Dict = {
+  cliTitle: "用 /usage 讀取 Claude 額度（推薦）",
+  cliHint: "每 10 分鐘在背景執行一次 Claude Code 內建的 /usage 指令。不聊天、不消耗 token、不花錢，也不會在你的對話紀錄中留下紀錄。需要這台 Mac 上已安裝並登入 Claude Code。",
+  cliFrom: "來自 Claude Code /usage，{t}前",
+  cliLoading: "正在用 Claude Code /usage 讀取額度…",
+  cliErr_not_installed: "找不到 Claude Code 命令列",
+  cliErr_not_signed_in: "Claude Code 尚未登入，請在終端機執行 claude 登入",
+  cliErr_no_subscription: "/usage 只顯示 Claude 訂閱的額度",
+  cliErr_timeout: "Claude Code /usage 逾時",
+  cliErr_parse_failed: "看不懂 /usage 的輸出（可能改了格式）",
+  cliErr_other: "/usage 失敗：{e}",
+  ballActivity: "懸浮球顯示進行中的對話",
+  ballActivityHint: "以角標顯示這台 Mac 上 Claude Code／Codex 進行中的對話數量，依它們的本機紀錄判斷。網頁版和 App 中的對話不計入。",
+  ballRunning: "{n} 個進行中",
   appName: "AI 用量浮窗",
   slConnect: "連接 Claude Code 狀態列",
   slDisconnect: "中斷連接",

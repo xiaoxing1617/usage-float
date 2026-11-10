@@ -31,7 +31,7 @@
 - **用量统计**：今天、昨天、本周、上周、本月、上月、近 7 天、近 30 天、自定义日期；按模型、按天分别统计。
 - **费用估算（可选）**：打开“自动获取模型价格”后，每 12 小时从 [LiteLLM 价格表](https://github.com/BerriAI/litellm) 更新一次价格。每次价格变化都会记录下来，每条用量按**当时的价格**计算（比如某模型昨天 $5、今天 $3，会分开算）。不打开就不显示费用。
 - **货币换算**：美元、人民币、日元、新加坡元、欧元，汇率来自欧洲央行（[Frankfurter](https://frankfurter.dev)）。
-- **悬浮球**：缩小成一个圆球，左边 Claude、右边 GPT；外圈是 5 小时额度，内圈是周额度。点一下展开，按住可拖动。
+- **悬浮球**：缩小成一个圆球，左边 Claude、右边 GPT；外圈是 5 小时额度，内圈是周额度。点一下展开，按住可拖动。有对话正在进行时，球上会出现数字角标（Claude Code / Codex 正在进行的对话数量），带轻微的波纹动画。
 - **出口 IP**：显示网站看到的公网出口 IP，以及国家和省 / 州（跟随界面语言）。
 - **IP 信任评分和延迟**：在 Claude、GPT 名称后面显示 🛡 评分（0–100，颜色从红到绿）和延迟毫秒数。点评分打开完整检测页，点毫秒数查看延迟是怎么测的。
 - **三种语言**：简体中文、繁體中文、English。首次打开时按系统语言自动选择，其他语言默认用英文；可以在设置里改。
@@ -108,13 +108,19 @@
 - **右上角**：`↻ 刷新`、`⚙ 设置`、`● 悬浮球`。
 - **开机自动启动**：“系统设置 → 通用 → 登录项”里添加 Usage Float。
 
-### 让 Claude 额度显示出来（重要）
+### Claude 额度从哪里来
 
-GPT 的额度会直接从 Codex 记录里读到。**Claude 的额度需要接入 Claude Code 的状态栏**：
+GPT 的额度会直接从 Codex 记录里读到。Claude 的额度默认这样获取：
+
+**用 `/usage` 读取（默认开启，推荐）**：浮窗每 10 分钟在后台运行一次 Claude Code 自带的 `/usage` 命令（`claude -p "/usage" --no-session-persistence`），读出 5 小时、每周和按模型的额度。这是本地命令，**不聊天、不消耗 token、不花钱**，也不会在你的会话历史里留下记录。只需要这台 Mac 上装好并登录了 Claude Code 命令行版。
+
+如果 `/usage` 用不了，也可以接入 Claude Code 的状态栏：
 
 1. 打开浮窗 **设置 → Claude Code 状态栏（推荐）→ 连接 Claude Code 状态栏**。浮窗会在 `~/.claude/settings.json` 里设置一个状态栏脚本（会先备份原文件，之前的状态栏会照常显示）。
 2. 在终端里用一次 Claude Code（运行 `claude` 并发一条消息）。
 3. 浮窗就会显示“来自 Claude Code 状态栏”的 5 小时和每周额度。之后每次在终端或 IDE 里用 Claude Code 都会自动更新。
+
+有多个来源时，浮窗自动用最新的那一个。
 
 > Claude 桌面版和网页版不会触发状态栏，只有命令行 / IDE 版的 Claude Code 会。
 > 设置里还有一个可选的“Claude 剩余额度（非官方）”开关，会从钥匙串读取登录信息去调用非官方接口，经常被限流，一般不需要打开。
@@ -137,6 +143,7 @@ GPT 的额度会直接从 Codex 记录里读到。**Claude 的额度需要接入
 | 汇率 | api.frankfurter.dev | 无 |
 | 出口 IP 和位置（可关） | Cloudflare `cdn-cgi/trace`、api.ipify.org、ipwho.is | 你的公网 IP（对方本来就能看到） |
 | 信任评分和延迟（可关） | claude.ai、chatgpt.com 的 `cdn-cgi/trace`，ip.net.coffee | 你的公网 IP |
+| Claude 额度（`/usage`，可关） | 由 Claude Code 自己访问 Anthropic | 浮窗本身不发送任何内容，也不读取登录令牌 |
 | Claude 额度接口（默认关） | api.anthropic.com | Claude Code 的登录令牌，只发给 Anthropic 官方 |
 
 会写入的本机文件：
@@ -144,6 +151,8 @@ GPT 的额度会直接从 Codex 记录里读到。**Claude 的额度需要接入
 - `~/.claude/settings.json`（只在你点“连接状态栏”时修改，修改前备份为 `settings.json.usage-float.bak`）
 - `~/.claude/usage-float/`（状态栏脚本和最新额度数据）
 - `~/Library/Application Support/com.usagefloat.app/`（价格历史、缓存）
+
+“正在进行的对话”只读取 `~/.claude/projects` 和 `~/.codex/sessions` 里最近几分钟写过的记录文件的末尾，用来判断对话是否结束，不会上传任何内容。
 
 ## 卸载
 

@@ -1,6 +1,6 @@
 [package]
 name = "usage-float"
-version = "0.2.0"
+version = "0.3.0"
 description = "macOS floating widget for Claude and GPT usage"
 authors = ["xiaoxing1617"]
 license = "MIT"
@@ -27,6 +27,7 @@ serde_json = { version = "1", features = ["preserve_order"] }
 walkdir = "2.5.0"
 chrono = "0.4.45"
 dirs = "7.0.0"
+regex = "1"
 reqwest = { version = "0.13.5", default-features = false, features = ["json", "rustls", "system-proxy"] }
 
 
