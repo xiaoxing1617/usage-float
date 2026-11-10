@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -38,6 +38,7 @@ import {
 import { CURRENCIES, formatMoney, loadRates, type Currency, type Rates } from "./currency";
 import { DICTS, LANGS, detectLang, fmt, intlLocale, type Dict, type Lang } from "./i18n";
 import { PERIODS, daysIn, rangeFor, ymd, type PeriodId, type Range } from "./periods";
+import { clock, loadTasks, mergeTasks, relTime, saveTasks, sortTasks, type Side, type TrackedTask } from "./tasks";
 import "./App.css";
 
 // ---------- settings (per-viewer convenience; safe defaults if storage fails) ----------
@@ -160,7 +161,14 @@ export default function App() {
   const [claudeBusy, setClaudeBusy] = useState(false);
   const [cli, setCli] = useState<CliUsage | null>(null);
   const [cliBusy, setCliBusy] = useState(false);
-  const [activity, setActivity] = useState<Activity | null>(null);
+  const [tasks, setTasks] = useState<TrackedTask[]>(loadTasks);
+  const updateTasks = useCallback((f: (prev: TrackedTask[]) => TrackedTask[]) => {
+    setTasks((prev) => {
+      const next = f(prev);
+      saveTasks(next);
+      return next;
+    });
+  }, []);
   const [slBusy, setSlBusy] = useState(false);
   const [slError, setSlError] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
@@ -217,7 +225,12 @@ export default function App() {
       setClaudeQuota(r);
       if (r.retry_at) next = Math.max(60_000, r.retry_at - Date.now() + 5_000);
     } catch (e) {
-      setClaudeQuota((prev) => ({ windows: prev?.windows ?? [], fetched_at: prev?.fetched_at ?? null, error: String(e), retry_at: null }));
+      setClaudeQuota((prev) => ({
+        windows: prev?.windows ?? [],
+        fetched_at: prev?.fetched_at ?? null,
+        error: String(e),
+        retry_at: null,
+      }));
     } finally {
       setClaudeBusy(false);
     }
@@ -239,7 +252,11 @@ export default function App() {
     try {
       setCli(await getClaudeCliUsage(force));
     } catch (e) {
-      setCli((prev) => ({ windows: prev?.windows ?? [], fetched_at: prev?.fetched_at ?? null, error: String(e) }));
+      setCli((prev) => ({
+        windows: prev?.windows ?? [],
+        fetched_at: prev?.fetched_at ?? null,
+        error: String(e),
+      }));
     } finally {
       setCliBusy(false);
     }
@@ -254,18 +271,18 @@ export default function App() {
     return () => clearInterval(id);
   }, [s.claudeCli, loadCli]);
 
-  // Running conversations: only needed while the ball is showing.
-  const showActivity = s.mode === "ball" && s.ballActivity;
+  // Running conversations. Polled often while the ball shows, slowly otherwise,
+  // so tasks that finish while the panel is open still end up as "finished".
   useEffect(() => {
-    if (!showActivity) {
-      setActivity(null);
-      return;
-    }
-    const tick = () => getActivity().then(setActivity).catch(() => {});
+    if (!s.ballActivity) return;
+    const tick = () =>
+      getActivity()
+        .then((a: Activity) => updateTasks((prev) => mergeTasks(prev, a, Date.now())))
+        .catch(() => {});
     tick();
-    const id = setInterval(tick, 4_000);
+    const id = setInterval(tick, s.mode === "ball" ? 4_000 : 15_000);
     return () => clearInterval(id);
-  }, [showActivity]);
+  }, [s.ballActivity, s.mode, updateTasks]);
 
   // Clock for countdowns.
   useEffect(() => {
@@ -275,7 +292,10 @@ export default function App() {
 
   // Window behaviour.
   useEffect(() => {
-    if (isTauri()) getCurrentWindow().setAlwaysOnTop(s.alwaysOnTop).catch(() => {});
+    if (isTauri())
+      getCurrentWindow()
+        .setAlwaysOnTop(s.alwaysOnTop)
+        .catch(() => {});
   }, [s.alwaysOnTop]);
   useEffect(() => {
     // The ball sizes itself (it grows when task bubbles are open).
@@ -307,7 +327,15 @@ export default function App() {
       }
       setIp(r);
     } catch (e) {
-      setIp({ ip: null, country: null, source: null, region: null, city: null, fetched_at: Date.now(), error: String(e) });
+      setIp({
+        ip: null,
+        country: null,
+        source: null,
+        region: null,
+        city: null,
+        fetched_at: Date.now(),
+        error: String(e),
+      });
     } finally {
       setIpBusy(false);
     }
@@ -322,7 +350,10 @@ export default function App() {
   const [drawer, setDrawer] = useState<DrawerState>(null);
   const [net, setNet] = useState<Partial<Record<ProviderId, NetCheck | "busy">>>({});
   const runNet = useCallback(async (service: ProviderId, force: boolean) => {
-    setNet((n) => ({ ...n, [service]: n[service] && n[service] !== "busy" ? n[service] : "busy" }));
+    setNet((n) => ({
+      ...n,
+      [service]: n[service] && n[service] !== "busy" ? n[service] : "busy",
+    }));
     try {
       const r = await checkNetwork(service, force);
       setNet((n) => ({ ...n, [service]: r }));
@@ -345,7 +376,13 @@ export default function App() {
     if (s.netCheck) (["claude", "openai"] as const).forEach((p) => runNet(p, false));
   };
 
-  const claudeView = effectiveClaudeWindows(claudeQuota, report?.claude_statusline, cli, report?.claude_hits ?? [], now);
+  const claudeView = effectiveClaudeWindows(
+    claudeQuota,
+    report?.claude_statusline,
+    cli,
+    report?.claude_hits ?? [],
+    now,
+  );
   const claudeWindows = claudeView.windows;
   const setStatusline = async (connect: boolean) => {
     setSlBusy(true);
@@ -371,7 +408,9 @@ export default function App() {
         t={t}
         claude={claudeWindows}
         gpt={report?.codex?.windows ?? []}
-        activity={activity}
+        tasks={s.ballActivity ? tasks : []}
+        onRemove={(side, id) => updateTasks((prev) => prev.filter((x) => !(x.side === side && x.id === id)))}
+        onClearDone={(side) => updateTasks((prev) => prev.filter((x) => x.side !== side || x.ended_at == null))}
         open={{ claude: s.ballListClaude, openai: s.ballListGpt }}
         onToggle={(side, v) => update(side === "claude" ? { ballListClaude: v } : { ballListGpt: v })}
         now={now}
@@ -379,7 +418,6 @@ export default function App() {
       />
     );
   }
-
 
   return (
     <div className="shell">
@@ -396,7 +434,15 @@ export default function App() {
       )}
       <header className="titlebar" data-tauri-drag-region>
         <span className="brand" data-tauri-drag-region>
-          <button className="traffic" title={t.hide} aria-label={t.hide} onClick={() => { setDrawer(null); if (isTauri()) getCurrentWindow().hide(); }}>
+          <button
+            className="traffic"
+            title={t.hide}
+            aria-label={t.hide}
+            onClick={() => {
+              setDrawer(null);
+              if (isTauri()) getCurrentWindow().hide();
+            }}
+          >
             <svg viewBox="0 0 12 12" aria-hidden="true">
               <path d="M3.5 3.5l5 5M8.5 3.5l-5 5" />
             </svg>
@@ -442,7 +488,14 @@ export default function App() {
           {s.showIp && (
             <button
               className="iprow"
-              title={[ip?.ip && ip.country ? [flagOf(ip.country), regionName(ip.country, locale), ip.region, ip.city].filter(Boolean).join(" ") : "", t.ipHint].filter(Boolean).join("\n")}
+              title={[
+                ip?.ip && ip.country
+                  ? [flagOf(ip.country), regionName(ip.country, locale), ip.region, ip.city].filter(Boolean).join(" ")
+                  : "",
+                t.ipHint,
+              ]
+                .filter(Boolean)
+                .join("\n")}
               onClick={loadIp}
               disabled={ipBusy}
             >
@@ -466,7 +519,16 @@ export default function App() {
           <QuotaCard
             provider="claude"
             name="Claude"
-            net={s.netCheck && <NetBadge t={t} r={net.claude} onScore={() => setDrawer({ kind: "site", provider: "claude" })} onLatency={() => setDrawer({ kind: "latency", provider: "claude" })} />}
+            net={
+              s.netCheck && (
+                <NetBadge
+                  t={t}
+                  r={net.claude}
+                  onScore={() => setDrawer({ kind: "site", provider: "claude" })}
+                  onLatency={() => setDrawer({ kind: "latency", provider: "claude" })}
+                />
+              )
+            }
             plan={report ? claudePlanLabel(report.claude_plan) : null}
             t={t}
             now={now}
@@ -495,7 +557,16 @@ export default function App() {
           <QuotaCard
             provider="openai"
             name="GPT"
-            net={s.netCheck && <NetBadge t={t} r={net.openai} onScore={() => setDrawer({ kind: "site", provider: "openai" })} onLatency={() => setDrawer({ kind: "latency", provider: "openai" })} />}
+            net={
+              s.netCheck && (
+                <NetBadge
+                  t={t}
+                  r={net.openai}
+                  onScore={() => setDrawer({ kind: "site", provider: "openai" })}
+                  onLatency={() => setDrawer({ kind: "latency", provider: "openai" })}
+                />
+              )
+            }
             plan={codexPlanLabel(report?.codex?.plan)}
             t={t}
             now={now}
@@ -505,14 +576,22 @@ export default function App() {
                 <div className="muted small">{t.codexNone}</div>
               ) : report.codex.observed_at ? (
                 <div className="muted small">
-                  {fmt(t.codexFrom, { t: duration(now - report.codex.observed_at, t) })}
+                  {fmt(t.codexFrom, {
+                    t: duration(now - report.codex.observed_at, t),
+                  })}
                 </div>
               ) : null
             }
           />
           <Stats t={t} s={s} update={update} report={report} withCost={withCost} money={money} />
           <footer className="muted small foot">
-            {report && fmt(t.updated, { t: new Date(report.generated_at).toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" }) })}
+            {report &&
+              fmt(t.updated, {
+                t: new Date(report.generated_at).toLocaleTimeString(locale, {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                }),
+              })}
           </footer>
         </main>
       )}
@@ -578,12 +657,7 @@ const Shield = () => (
   </svg>
 );
 
-function NetBadge(props: {
-  t: Dict;
-  r: NetCheck | "busy" | undefined;
-  onScore: () => void;
-  onLatency: () => void;
-}) {
+function NetBadge(props: { t: Dict; r: NetCheck | "busy" | undefined; onScore: () => void; onLatency: () => void }) {
   const { t, r, onScore, onLatency } = props;
   if (!r) return null;
   if (r === "busy") return <span className="net muted">…</span>;
@@ -593,7 +667,13 @@ function NetBadge(props: {
     const lv = r.restricted ? t.netRestricted : (t[`lv_${scoreLevel(r.trust_score)}` as keyof Dict] as string);
     const tip = `${t.trust} ${r.trust_score} · ${lv}\n${t.scoreClick}`;
     scoreEl = (
-      <button className="score" style={{ background: c.bg, color: c.fg }} title={tip} aria-label={tip} onClick={onScore}>
+      <button
+        className="score"
+        style={{ background: c.bg, color: c.fg }}
+        title={tip}
+        aria-label={tip}
+        onClick={onScore}
+      >
         <Shield />
         {r.trust_score}
       </button>
@@ -639,7 +719,13 @@ function Drawer(props: {
       const el = body.current;
       if (!el) return;
       const rect = el.getBoundingClientRect();
-      invoke("open_site", { url, x: rect.left, y: rect.top, width: rect.width, height: rect.height }).catch(() => {});
+      invoke("open_site", {
+        url,
+        x: rect.left,
+        y: rect.top,
+        width: rect.width,
+        height: rect.height,
+      }).catch(() => {});
     }, 220); // after the slide-in animation
     return () => {
       clearTimeout(timer);
@@ -654,13 +740,19 @@ function Drawer(props: {
 
   const res = r && r !== "busy" ? r : null;
   return (
-    <div className="drawer" role="dialog" aria-label={state.kind === "site" ? fmt(t.siteTitle, { name }) : fmt(t.latTitle, { name })}>
+    <div
+      className="drawer"
+      role="dialog"
+      aria-label={state.kind === "site" ? fmt(t.siteTitle, { name }) : fmt(t.latTitle, { name })}
+    >
       <div className="drawerhead">
         <button className="tbtn" onClick={onClose}>
           <span className="ico">‹</span>
           {t.back}
         </button>
-        <span className="drawertitle">{state.kind === "site" ? fmt(t.siteTitle, { name }) : fmt(t.latTitle, { name })}</span>
+        <span className="drawertitle">
+          {state.kind === "site" ? fmt(t.siteTitle, { name }) : fmt(t.latTitle, { name })}
+        </span>
         {state.kind === "site" ? (
           <button className="tbtn" title={t.openInBrowser} onClick={openExternal}>
             <span className="ico">↗</span>
@@ -694,9 +786,17 @@ function Drawer(props: {
             <dd>{t.latMethodText}</dd>
             <dt>{t.latScale}</dt>
             <dd className="scale">
-              <span><i className="d fast" />&lt; 250ms {t.lat_fast}</span>
-              <span><i className="d ok" />&lt; 500ms {t.lat_ok}</span>
-              <span><i className="d slow" />≥ 500ms {t.lat_slow}</span>
+              <span>
+                <i className="d fast" />
+                &lt; 250ms {t.lat_fast}
+              </span>
+              <span>
+                <i className="d ok" />
+                &lt; 500ms {t.lat_ok}
+              </span>
+              <span>
+                <i className="d slow" />≥ 500ms {t.lat_slow}
+              </span>
             </dd>
             {res?.ip && (
               <>
@@ -709,7 +809,9 @@ function Drawer(props: {
             {res && (
               <>
                 <dt>{t.checkedAt}</dt>
-                <dd>{now - res.checked_at < 60_000 ? t.ago_s : fmt(t.agoFmt, { t: duration(now - res.checked_at, t) })}</dd>
+                <dd>
+                  {now - res.checked_at < 60_000 ? t.ago_s : fmt(t.agoFmt, { t: duration(now - res.checked_at, t) })}
+                </dd>
               </>
             )}
           </dl>
@@ -743,7 +845,9 @@ function QuotaCard(props: {
         </span>
         <span className={"badge" + (plan ? "" : " unknown")}>{plan ?? t.planUnknown}</span>
       </div>
-      {windows?.map((w) => <QuotaBar key={w.key} w={w} t={t} now={now} />)}
+      {windows?.map((w) => (
+        <QuotaBar key={w.key} w={w} t={t} now={now} />
+      ))}
       {body}
     </section>
   );
@@ -769,18 +873,35 @@ function ClaudeSources(props: {
   onConnect: () => void;
   onUseEndpoint: () => void;
 }) {
-  const { t, now, view, sl, endpointOn, quota, cli, cliOn, cliBusy, onCliRetry, busy, slBusy, slError, onRetry, onConnect, onUseEndpoint } = props;
+  const {
+    t,
+    now,
+    view,
+    sl,
+    endpointOn,
+    quota,
+    cli,
+    cliOn,
+    cliBusy,
+    onCliRetry,
+    busy,
+    slBusy,
+    slError,
+    onRetry,
+    onConnect,
+    onUseEndpoint,
+  } = props;
   const ago = (ms: number | null) => duration(now - (ms ?? now), t);
   const source =
     view.source === "cli"
       ? fmt(t.cliFrom, { t: ago(view.at) })
       : view.source === "statusline"
-      ? fmt(t.slFrom, { t: ago(view.at) })
-      : view.source === "api"
-        ? fmt(t.apiFrom, { t: ago(view.at) })
-        : view.source === "logs"
-          ? t.logsFrom
-          : null;
+        ? fmt(t.slFrom, { t: ago(view.at) })
+        : view.source === "api"
+          ? fmt(t.apiFrom, { t: ago(view.at) })
+          : view.source === "logs"
+            ? t.logsFrom
+            : null;
   // Endpoint errors only matter when the endpoint is the best source we have.
   const showApiError = endpointOn && quota?.error && !view.source;
   const showCliError = cliOn && cli?.error && view.source !== "cli";
@@ -801,7 +922,9 @@ function ClaudeSources(props: {
       {showApiError && (
         <div className="qerr">
           <div className="warn small">{quotaError(quota!.error!, t)}</div>
-          {quota!.retry_at && <div className="muted tiny">{fmt(t.autoRetry, { t: duration(quota!.retry_at - now, t) })}</div>}
+          {quota!.retry_at && (
+            <div className="muted tiny">{fmt(t.autoRetry, { t: duration(quota!.retry_at - now, t) })}</div>
+          )}
           <button className="btn" disabled={busy} onClick={onRetry}>
             {busy ? "…" : t.retry}
           </button>
@@ -849,25 +972,37 @@ const lvl = (p: number | null) => (p == null ? "" : p <= 10 ? "crit" : p <= 30 ?
  */
 const BALL = 108;
 /** Bubble width plus the gap to the ball. */
-const BUBBLE_W = 204;
-
-type Side = "claude" | "openai";
+const BUBBLE_W = 224;
 
 function Ball(props: {
   t: Dict;
   claude: QuotaWindow[];
   gpt: QuotaWindow[];
-  activity: Activity | null;
+  tasks: TrackedTask[];
+  onRemove: (side: Side, id: string) => void;
+  onClearDone: (side: Side) => void;
   now: number;
   open: Record<Side, boolean>;
   onToggle: (side: Side, open: boolean) => void;
   onOpen: () => void;
 }) {
-  const { t, claude, gpt, activity, now, open, onToggle, onOpen } = props;
-  const sides = [
-    { id: "claude" as const, name: "Claude", h5: leftFor(claude, "five_hour", now), wk: leftFor(claude, "seven_day", now), busy: activity?.claude ?? 0, tasks: activity?.claude_tasks ?? [] },
-    { id: "openai" as const, name: "GPT", h5: leftFor(gpt, "five_hour", now), wk: leftFor(gpt, "seven_day", now), busy: activity?.codex ?? 0, tasks: activity?.codex_tasks ?? [] },
-  ];
+  const { t, claude, gpt, tasks, onRemove, onClearDone, now, open, onToggle, onOpen } = props;
+  const sideOf = (id: Side, name: string, ws: QuotaWindow[]) => {
+    const list = sortTasks(tasks.filter((x) => x.side === id));
+    const running = list.filter((x) => x.ended_at == null).length;
+    return {
+      id,
+      name,
+      h5: leftFor(ws, "five_hour", now),
+      wk: leftFor(ws, "seven_day", now),
+      running,
+      done: list.length - running,
+      /** what the badge shows: running tasks first, else finished ones */
+      busy: running || list.length,
+      tasks: list,
+    };
+  };
+  const sides = [sideOf("claude", "Claude", claude), sideOf("openai", "GPT", gpt)];
 
   // Click opens the panel; dragging past a few pixels moves the window instead.
   const start = useRef<{ x: number; y: number } | null>(null);
@@ -882,7 +1017,10 @@ function Ball(props: {
     if (Math.hypot(e.screenX - start.current.x, e.screenY - start.current.y) > 3) {
       dragged.current = true;
       start.current = null;
-      if (isTauri()) getCurrentWindow().startDragging().catch(() => {});
+      if (isTauri())
+        getCurrentWindow()
+          .startDragging()
+          .catch(() => {});
     }
   };
   const onUp = () => {
@@ -923,7 +1061,11 @@ function Ball(props: {
     if (applied.current == null) {
       invoke("resize_on_screen", { width, height }).catch(() => {});
     } else {
-      invoke("resize_shift", { width, height, dx: applied.current - offset }).catch(() => {});
+      invoke("resize_shift", {
+        width,
+        height,
+        dx: applied.current - offset,
+      }).catch(() => {});
     }
     applied.current = offset;
   }, [left, right, contentH]);
@@ -936,21 +1078,33 @@ function Ball(props: {
     { key: "h5" as const, r: 46, cls: "ring" },
     { key: "wk" as const, r: 40, cls: "ring wkring" },
   ];
-  const arc = (r: number, isLeft: boolean) =>
-    `M ${C} ${C + r} A ${r} ${r} 0 0 ${isLeft ? 1 : 0} ${C} ${C - r}`;
+  const arc = (r: number, isLeft: boolean) => `M ${C} ${C + r} A ${r} ${r} 0 0 ${isLeft ? 1 : 0} ${C} ${C - r}`;
   const pctText = (p: number | null) => (p == null ? "—" : `${p}%`);
   const tip = [
     t.ballHint,
     ...sides.map(
       (x) =>
         `${x.name}: 5h ${pctText(x.h5)} · ${t.win_seven_day} ${pctText(x.wk)}` +
-        (x.busy ? ` · ${fmt(t.ballRunning, { n: x.busy })}` : ""),
+        (x.running ? ` · ${fmt(t.ballRunning, { n: x.running })}` : "") +
+        (x.done ? ` · ${fmt(t.taskDoneN, { n: x.done })}` : ""),
     ),
   ].join("\n");
 
   const bubble = (x: (typeof sides)[number]) =>
     shown(x.id, x.busy) ? (
-      <TaskBubble key={"bubble" + x.id} t={t} side={x.id} name={x.name} tasks={x.tasks} closing={closing === x.id} onCollapse={() => collapse(x.id)} />
+      <TaskBubble
+        key={"bubble" + x.id}
+        t={t}
+        side={x.id}
+        name={x.name}
+        tasks={x.tasks}
+        running={x.running}
+        done={x.done}
+        closing={closing === x.id}
+        onCollapse={() => collapse(x.id)}
+        onRemove={(id) => onRemove(x.id, id)}
+        onClearDone={() => onClearDone(x.id)}
+      />
     ) : null;
 
   return (
@@ -958,7 +1112,7 @@ function Ball(props: {
       {bubble(sides[0])}
       <div className="ballwrap">
         <div
-          className={"ball" + (sides.some((x) => x.busy) ? " active" : "")}
+          className={"ball" + (sides.some((x) => x.running) ? " active" : "")}
           title={tip}
           role="button"
           aria-label={tip}
@@ -977,7 +1131,11 @@ function Ball(props: {
                   <g key={x.id + g.key} className={g.key === "wk" ? "wkg" : undefined}>
                     <path d={d} className={g.key === "wk" ? "ring-track thin" : "ring-track"} />
                     {v != null && v > 0 && (
-                      <path d={d} className={`${g.cls} ${x.id} ${lvl(v)}`} strokeDasharray={`${(len * v) / 100} ${len}`} />
+                      <path
+                        d={d}
+                        className={`${g.cls} ${x.id} ${lvl(v)}`}
+                        strokeDasharray={`${(len * v) / 100} ${len}`}
+                      />
                     )}
                   </g>
                 );
@@ -987,9 +1145,15 @@ function Ball(props: {
           {sides.map((x) =>
             x.busy > 0 ? (
               <button
-                key={"badge" + x.id + x.busy}
-                className={`busy ${x.id}` + (shown(x.id, x.busy) ? " on" : "")}
-                title={shown(x.id, x.busy) ? t.taskCollapse : t.taskExpand}
+                key={"badge" + x.id + (x.running ? "r" : "d") + x.busy}
+                className={`busy ${x.id}` + (x.running ? "" : " idle") + (shown(x.id, x.busy) ? " on" : "")}
+                title={[
+                  x.running ? fmt(t.ballRunning, { n: x.running }) : null,
+                  x.done ? fmt(t.taskDoneN, { n: x.done }) : null,
+                  shown(x.id, x.busy) ? t.taskCollapse : t.taskExpand,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
                 onMouseDown={(e) => e.stopPropagation()}
                 onMouseUp={(e) => e.stopPropagation()}
                 onClick={(e) => {
@@ -1025,58 +1189,155 @@ function Ball(props: {
   );
 }
 
-/** "4:05", "1:02:09" — how long the current turn has been running. */
-function elapsed(ms: number): string {
-  const sec = Math.max(0, Math.floor(ms / 1000));
-  const h = Math.floor(sec / 3600);
-  const m = Math.floor((sec % 3600) / 60);
-  const ss = String(sec % 60).padStart(2, "0");
-  return h ? `${h}:${String(m).padStart(2, "0")}:${ss}` : `${m}:${ss}`;
-}
-
 function TaskBubble(props: {
   t: Dict;
   side: Side;
   name: string;
-  tasks: Activity["claude_tasks"];
+  tasks: TrackedTask[];
+  running: number;
+  done: number;
   closing: boolean;
   onCollapse: () => void;
+  onRemove: (id: string) => void;
+  onClearDone: () => void;
 }) {
-  const { t, side, name, tasks, closing, onCollapse } = props;
+  const { t, side, name, tasks, running, done, closing, onCollapse, onRemove, onClearDone } = props;
   // Ticks every second so the timers run smoothly.
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, []);
+  // Fade the list edge when it scrolls, so it's clear there is more.
+  const listRef = useRef<HTMLUListElement>(null);
+  const [more, setMore] = useState({ top: false, bottom: false });
+  const checkMore = () => {
+    const el = listRef.current;
+    if (!el) return;
+    const top = el.scrollTop > 2;
+    const bottom = el.scrollTop + el.clientHeight < el.scrollHeight - 2;
+    setMore((m) => (m.top === top && m.bottom === bottom ? m : { top, bottom }));
+  };
+  useEffect(() => {
+    const el = listRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(checkMore);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  useEffect(checkMore, [tasks.length]);
+  const open = (task: TrackedTask) => {
+    if (task.openable && isTauri()) invoke("open_task", { provider: side, id: task.id }).catch(() => {});
+  };
   return (
     <div className={`bubble ${side}` + (closing ? " closing" : "")} role="dialog" aria-label={name}>
       <span className="tail" aria-hidden="true" />
       <div className="bhead">
         <span className="bname">{name}</span>
-        <span className="bcount">{fmt(t.ballRunning, { n: tasks.length })}</span>
+        <span className="bpills">
+          {running > 0 && <span className="bcount live">{fmt(t.pillRunning, { n: running })}</span>}
+          {done > 0 && <span className="bcount">{fmt(t.pillDone, { n: done })}</span>}
+        </span>
       </div>
-      <ul className="tasks">
-        {tasks.map((task, i) => (
-          <li key={task.id} className="task" style={{ animationDelay: `${60 + i * 45}ms` }} title={task.title ?? t.taskUntitled}>
-            <span className="eq" aria-hidden="true">
-              <i />
-              <i />
-              <i />
-            </span>
-            <span className="tbody">
-              <span className="ttitle">{task.title ?? t.taskUntitled}</span>
-              {task.started_at != null && <span className="ttime">{elapsed(now - task.started_at)}</span>}
-            </span>
-          </li>
-        ))}
+      <ul
+        className={"tasks" + (more.top ? " more-top" : "") + (more.bottom ? " more-bottom" : "")}
+        ref={listRef}
+        onScroll={checkMore}
+        onAnimationEnd={checkMore}
+      >
+        {tasks.map((task, i) => {
+          const live = task.ended_at == null;
+          const title = task.title ?? t.taskUntitled;
+          const ran = task.started_at != null ? clock((task.ended_at ?? now) - task.started_at) : null;
+          const firstDone = !live && (i === 0 || tasks[i - 1].ended_at == null);
+          return (
+            <Fragment key={task.id}>
+              {firstDone && (
+                <li className="tsep" aria-hidden="true">
+                  <span>{t.taskDoneSection}</span>
+                </li>
+              )}
+              <li className={"task" + (live ? " live" : " done")} style={{ animationDelay: `${40 + i * 40}ms` }}>
+                <span className="tstate" aria-hidden="true">
+                  {live ? (
+                    <span className="eq">
+                      <i />
+                      <i />
+                      <i />
+                    </span>
+                  ) : (
+                    <svg viewBox="0 0 14 14" width="13" height="13">
+                      <circle cx="7" cy="7" r="6.2" />
+                      <path d="M4.3 7.2 6.2 9l3.5-3.8" />
+                    </svg>
+                  )}
+                </span>
+                <span className="tbody">
+                  <span className="trow">
+                    {task.openable ? (
+                      <button className="ttitle link" title={`${title}\n${t.taskOpen}`} onClick={() => open(task)}>
+                        {title}
+                      </button>
+                    ) : (
+                      <span className="ttitle" title={title}>
+                        {title}
+                      </span>
+                    )}
+                    {!live && (
+                      <button
+                        className="tx"
+                        title={t.taskRemove}
+                        aria-label={t.taskRemove}
+                        onClick={() => onRemove(task.id)}
+                      >
+                        <svg viewBox="0 0 10 10" width="8" height="8" aria-hidden="true">
+                          <path d="M2 2l6 6M8 2 2 8" />
+                        </svg>
+                      </button>
+                    )}
+                  </span>
+                  <span className="tmeta">
+                    <span title={task.created_at != null ? new Date(task.created_at).toLocaleString() : undefined}>
+                      {task.created_at != null
+                        ? fmt(t.taskCreated, {
+                            t: relTime(task.created_at, now, t),
+                          })
+                        : ""}
+                    </span>
+                    {ran && (
+                      <span className="tdur">
+                        {fmt(live ? t.taskRunningFor : t.taskRanFor, {
+                          t: ran,
+                        })}
+                      </span>
+                    )}
+                  </span>
+                </span>
+              </li>
+            </Fragment>
+          );
+        })}
       </ul>
-      <button className="bfold" onClick={onCollapse} title={t.taskCollapse} aria-label={t.taskCollapse}>
-        <svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true">
-          <path d="M3 7.5 6 4.5l3 3" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-        <span>{t.taskCollapse}</span>
-      </button>
+      <div className="bfoot">
+        {done > 0 && (
+          <button className="bclear" onClick={onClearDone}>
+            {t.taskClearDone}
+          </button>
+        )}
+        <button className="bfold" onClick={onCollapse} title={t.taskCollapse} aria-label={t.taskCollapse}>
+          <svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true">
+            <path
+              d="M3 7.5 6 4.5l3 3"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          <span>{t.taskCollapse}</span>
+        </button>
+      </div>
     </div>
   );
 }
@@ -1092,7 +1353,15 @@ interface Agg {
   cost: number;
   approx: boolean;
 }
-const emptyAgg = (): Agg => ({ tokens: 0, input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0, approx: false });
+const emptyAgg = (): Agg => ({
+  tokens: 0,
+  input: 0,
+  output: 0,
+  cacheRead: 0,
+  cacheWrite: 0,
+  cost: 0,
+  approx: false,
+});
 function add(a: Agg, r: DailyRow) {
   a.tokens += totalTokens(r);
   a.input += r.input;
@@ -1118,7 +1387,10 @@ function Stats(props: {
     [report, range.start, range.end],
   );
 
-  const byProvider: Record<ProviderId, Agg> = { claude: emptyAgg(), openai: emptyAgg() };
+  const byProvider: Record<ProviderId, Agg> = {
+    claude: emptyAgg(),
+    openai: emptyAgg(),
+  };
   const total = emptyAgg();
   const byModel = new Map<string, Agg & { provider: ProviderId }>();
   const byDay = new Map<string, { claude: number; openai: number }>();
@@ -1158,7 +1430,11 @@ function Stats(props: {
           </label>
           <label>
             {t.to}
-            <input type="date" value={s.custom.end} onChange={(e) => update({ custom: { ...s.custom, end: e.target.value } })} />
+            <input
+              type="date"
+              value={s.custom.end}
+              onChange={(e) => update({ custom: { ...s.custom, end: e.target.value } })}
+            />
           </label>
         </div>
       )}
@@ -1169,7 +1445,11 @@ function Stats(props: {
       <div className="sumrow">
         <span className="muted small">{t.total}</span>
         <span className="big">{withCost ? money(total.cost) : compact(total.tokens) + " " + t.tokens}</span>
-        {withCost && <span className="muted tiny">{compact(total.tokens)} {t.tokens}</span>}
+        {withCost && (
+          <span className="muted tiny">
+            {compact(total.tokens)} {t.tokens}
+          </span>
+        )}
       </div>
 
       <div className="totals">
@@ -1180,9 +1460,7 @@ function Stats(props: {
               {p === "claude" ? "Claude" : "GPT"}
             </div>
             <div className="big">{withCost ? money(byProvider[p].cost) : compact(byProvider[p].tokens)}</div>
-            <div className="muted tiny">
-              {withCost ? `${compact(byProvider[p].tokens)} ${t.tokens}` : t.tokens}
-            </div>
+            <div className="muted tiny">{withCost ? `${compact(byProvider[p].tokens)} ${t.tokens}` : t.tokens}</div>
           </div>
         ))}
       </div>
@@ -1276,7 +1554,12 @@ function SettingsView(props: {
 }) {
   const { t, s, update, prices, pricesBusy, onFetchPrices, rates, locale, sl, slBusy, slError, onStatusline } = props;
   const dt = (ms: number) =>
-    new Date(ms).toLocaleString(locale, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+    new Date(ms).toLocaleString(locale, {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   return (
     <main className="scroll settings">
       <section className="card">
@@ -1346,7 +1629,10 @@ function SettingsView(props: {
               {prices?.error
                 ? fmt(t.pricesError, { e: prices.error })
                 : prices?.last_checked
-                  ? fmt(t.pricesLast, { t: dt(prices.last_checked), n: prices.snapshots })
+                  ? fmt(t.pricesLast, {
+                      t: dt(prices.last_checked),
+                      n: prices.snapshots,
+                    })
                   : t.pricesNever}
             </span>
             <button className="btn" disabled={pricesBusy} onClick={onFetchPrices}>

@@ -26,6 +26,10 @@ pub struct Task {
     pub title: Option<String>,
     /// Unix ms when the current turn started, if known.
     pub started_at: Option<i64>,
+    /// Unix ms when the conversation was created, if known.
+    pub created_at: Option<i64>,
+    /// Can be opened in the Claude desktop app / Codex app.
+    pub openable: bool,
 }
 
 #[derive(Serialize, Default, Clone, Debug)]
@@ -42,11 +46,17 @@ const TAIL_BYTES: u64 = 256 * 1024;
 
 pub fn scan() -> Activity {
     let home = dirs::home_dir().unwrap_or_default();
+    let desktop = desktop_sessions();
     let claude_tasks = collect(&home.join(".claude/projects"), 2, |p| p.extension().is_some_and(|e| e == "jsonl"), |p, tail, _| {
-        claude_task(tail).map(|(title, started_at)| Task {
-            id: p.file_stem().and_then(|s| s.to_str()).unwrap_or_default().to_string(),
-            title,
+        let (title, started_at) = claude_task(tail)?;
+        let id = p.file_stem().and_then(|s| s.to_str()).unwrap_or_default().to_string();
+        let d = desktop.get(&id);
+        Some(Task {
+            title: d.and_then(|d| d.title.clone()).or(title),
             started_at,
+            created_at: d.and_then(|d| d.created_at).or_else(|| first_timestamp(p)),
+            openable: d.is_some(),
+            id,
         })
     });
     let index = codex_index(&home.join(".codex/session_index.jsonl"));
@@ -58,7 +68,8 @@ pub fn scan() -> Activity {
             let (started_at, last_prompt) = codex_task(tail, fresh)?;
             let id = codex_id(p.file_name()?.to_str()?).unwrap_or_default();
             let title = index.get(&id).cloned().or(last_prompt);
-            Some(Task { id, title, started_at })
+            let openable = is_uuid(&id);
+            Some(Task { title, started_at, created_at: first_timestamp(p), openable, id })
         },
     );
     Activity { claude: claude_tasks.len() as u32, codex: codex_tasks.len() as u32, claude_tasks, codex_tasks }
@@ -217,6 +228,82 @@ pub fn codex_task(tail: &str, fresh: bool) -> Option<(Option<i64>, Option<String
     }
     // A long turn may push its start out of the tail; trust very recent writes.
     running.unwrap_or(fresh).then_some((started_at, prompt))
+}
+
+/// Unix ms of the first timestamped record (when the conversation was created).
+fn first_timestamp(p: &Path) -> Option<i64> {
+    use std::io::BufRead;
+    let f = std::fs::File::open(p).ok()?;
+    for line in std::io::BufReader::new(f).lines().take(20) {
+        let Ok(line) = line else { break };
+        if let Ok(v) = serde_json::from_str::<Value>(&line) {
+            if let Some(t) = ts(&v).or_else(|| ts(&v["payload"])) {
+                return Some(t);
+            }
+        }
+    }
+    None
+}
+
+fn is_uuid(s: &str) -> bool {
+    s.len() == 36 && s.chars().enumerate().all(|(i, c)| if [8, 13, 18, 23].contains(&i) { c == '-' } else { c.is_ascii_hexdigit() })
+}
+
+/// A Claude desktop app Code session (`claude-code-sessions/**/local_*.json`).
+#[derive(Clone)]
+struct DesktopSession {
+    local_id: String,
+    title: Option<String>,
+    created_at: Option<i64>,
+}
+
+/// Desktop sessions by Claude Code session id, cached by file modification time.
+fn desktop_sessions() -> HashMap<String, DesktopSession> {
+    use std::sync::Mutex;
+    static CACHE: Mutex<Option<HashMap<std::path::PathBuf, (SystemTime, Option<(String, DesktopSession)>)>>> = Mutex::new(None);
+    let root = dirs::data_dir().unwrap_or_default().join("Claude/claude-code-sessions");
+    let mut guard = CACHE.lock().unwrap();
+    let cache = guard.get_or_insert_with(HashMap::new);
+    let mut seen = std::collections::HashSet::new();
+    for e in walkdir::WalkDir::new(&root).max_depth(3).into_iter().flatten() {
+        let p = e.path();
+        let ok = p.file_name().and_then(|n| n.to_str()).is_some_and(|n| n.starts_with("local_") && n.ends_with(".json"));
+        if !ok || !e.file_type().is_file() {
+            continue;
+        }
+        let Ok(mtime) = std::fs::metadata(p).and_then(|m| m.modified()) else { continue };
+        seen.insert(p.to_path_buf());
+        if cache.get(p).is_some_and(|(m, _)| *m == mtime) {
+            continue;
+        }
+        let parsed = std::fs::read_to_string(p).ok().and_then(|t| serde_json::from_str::<Value>(&t).ok()).and_then(|v| {
+            let local_id = v["sessionId"].as_str().filter(|s| valid_local_id(s))?.to_string();
+            let cli = v["cliSessionId"].as_str()?.to_string();
+            Some((cli, DesktopSession { local_id, title: v["title"].as_str().and_then(|s| short(s, 80)), created_at: v["createdAt"].as_i64() }))
+        });
+        cache.insert(p.to_path_buf(), (mtime, parsed));
+    }
+    cache.retain(|p, _| seen.contains(p));
+    cache.values().filter_map(|(_, v)| v.clone()).collect()
+}
+
+fn valid_local_id(s: &str) -> bool {
+    s.strip_prefix("local_").is_some_and(|r| !r.is_empty() && r.len() <= 64 && r.chars().all(|c| c.is_ascii_alphanumeric() || c == '-'))
+}
+
+/// Opens a conversation in its app. Only builds the two known deep links,
+/// from validated ids, so nothing else can be opened through this.
+pub fn open_task(provider: &str, id: &str) -> Result<(), String> {
+    let url = match provider {
+        "openai" if is_uuid(id) => format!("codex://threads/{id}"),
+        "claude" if is_uuid(id) => {
+            let d = desktop_sessions().remove(id).ok_or("not_openable")?;
+            format!("claude://code/continue?session={}", d.local_id)
+        }
+        _ => return Err("not_openable".into()),
+    };
+    std::process::Command::new("/usr/bin/open").arg(url).status().map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 /// Session id from `rollout-2026-11-10T13-14-40-<uuid>[_<uuid>].jsonl`.

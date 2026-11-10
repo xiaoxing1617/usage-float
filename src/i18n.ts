@@ -7,6 +7,20 @@ export const LANGS: { id: Lang; label: string }[] = [
 ];
 
 const en = {
+  pillRunning: "{n} running",
+  pillDone: "{n} done",
+  taskDoneN: "{n} done",
+  taskRunningFor: "Running {t}",
+  taskRanFor: "Ran {t}",
+  taskCreated: "{t}",
+  taskOpen: "Click to open this conversation",
+  taskRemove: "Remove from list",
+  taskClearDone: "Clear finished",
+  taskDoneSection: "Finished",
+  rel_now: "just now",
+  rel_min: "{n} min ago",
+  rel_hour: "{n} h ago",
+  rel_yday: "yesterday {t}",
   taskExpand: "Show running tasks",
   taskCollapse: "Collapse",
   taskUntitled: "Untitled conversation",
@@ -164,6 +178,20 @@ const en = {
 export type Dict = typeof en;
 
 const zhHans: Dict = {
+  pillRunning: "{n} 进行中",
+  pillDone: "{n} 已完成",
+  taskDoneN: "{n} 个已完成",
+  taskRunningFor: "已运行 {t}",
+  taskRanFor: "共运行 {t}",
+  taskCreated: "{t}",
+  taskOpen: "点击打开这个对话",
+  taskRemove: "从列表移除",
+  taskClearDone: "清除已完成",
+  taskDoneSection: "已完成",
+  rel_now: "刚刚",
+  rel_min: "{n} 分钟前",
+  rel_hour: "{n} 小时前",
+  rel_yday: "昨天 {t}",
   taskExpand: "展开任务列表",
   taskCollapse: "收起",
   taskUntitled: "未命名对话",
@@ -315,6 +343,20 @@ const zhHans: Dict = {
 };
 
 const zhHant: Dict = {
+  pillRunning: "{n} 進行中",
+  pillDone: "{n} 已完成",
+  taskDoneN: "{n} 個已完成",
+  taskRunningFor: "已執行 {t}",
+  taskRanFor: "共執行 {t}",
+  taskCreated: "{t}",
+  taskOpen: "點擊開啟這個對話",
+  taskRemove: "從列表移除",
+  taskClearDone: "清除已完成",
+  taskDoneSection: "已完成",
+  rel_now: "剛剛",
+  rel_min: "{n} 分鐘前",
+  rel_hour: "{n} 小時前",
+  rel_yday: "昨天 {t}",
   taskExpand: "展開任務列表",
   taskCollapse: "收起",
   taskUntitled: "未命名對話",

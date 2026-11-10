@@ -96,6 +96,8 @@ export interface RunningTask {
   id: string;
   title: string | null;
   started_at: number | null; // unix ms
+  created_at: number | null; // unix ms
+  openable: boolean;
 }
 export interface Activity {
   claude: number;

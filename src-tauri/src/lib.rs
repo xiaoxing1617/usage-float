@@ -258,6 +258,12 @@ fn resize_on_screen(window: tauri::WebviewWindow, width: f64, height: f64) -> Re
     place_on_screen(&window, (width * scale).round() as i32, (height * scale).round() as i32).map_err(|e| e.to_string())
 }
 
+/// Opens a running / finished conversation in the Claude desktop app or Codex app.
+#[tauri::command]
+fn open_task(provider: String, id: String) -> Result<(), String> {
+    activity::open_task(&provider, &id)
+}
+
 /// Resizes the window and moves it `dx` logical px horizontally, so content
 /// (the floating ball) keeps its place on screen when bubbles open beside it.
 /// The result is kept inside the monitor's work area.
@@ -348,7 +354,7 @@ pub fn run() {
                 .build(app)?;
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![get_usage, refresh_prices, get_claude_quota, resize_on_screen, connect_statusline, disconnect_statusline, get_public_ip, check_network, open_site, close_site, get_claude_cli_usage, get_activity, resize_shift])
+        .invoke_handler(tauri::generate_handler![get_usage, refresh_prices, get_claude_quota, resize_on_screen, connect_statusline, disconnect_statusline, get_public_ip, check_network, open_site, close_site, get_claude_cli_usage, get_activity, resize_shift, open_task])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
