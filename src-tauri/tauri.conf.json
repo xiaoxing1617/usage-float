@@ -43,7 +43,7 @@
       "icons/icon.ico"
     ],
     "category": "Utility",
-    "shortDescription": "Floating widget for Claude & GPT usage",
+    "shortDescription": "Floating widget for Claude & ChatGPT usage",
     "macOS": {
       "minimumSystemVersion": "11.0"
     }

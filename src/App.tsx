@@ -166,7 +166,7 @@ export default function App() {
   const updateTasks = useCallback((f: (prev: TrackedTask[]) => TrackedTask[]) => {
     setTasks((prev) => {
       const next = f(prev);
-      saveTasks(next);
+      if (next !== prev) saveTasks(next);
       return next;
     });
   }, []);

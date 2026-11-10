@@ -3,6 +3,7 @@ mod claude;
 mod cli_usage;
 mod drawer;
 mod ip;
+mod platform;
 mod pricing;
 mod scan;
 mod statusline;

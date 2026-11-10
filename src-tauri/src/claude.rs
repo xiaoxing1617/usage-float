@@ -35,7 +35,7 @@ pub fn read_plan() -> ClaudePlan {
 
 #[cfg(target_os = "macos")]
 fn read_token() -> Result<String, String> {
-    let out = std::process::Command::new("/usr/bin/security")
+    let out = crate::platform::command("/usr/bin/security")
         .args(["find-generic-password", "-s", "Claude Code-credentials", "-w"])
         .output()
         .map_err(|e| e.to_string())?;

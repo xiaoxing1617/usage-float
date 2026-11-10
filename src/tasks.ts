@@ -49,7 +49,14 @@ export function mergeTasks(prev: TrackedTask[], a: Activity, now: number): Track
     const live = running.get(key);
     if (live) {
       // Running (again): it comes back to the list as running.
-      out.push({ ...live, title: live.title ?? t.title, created_at: live.created_at ?? t.created_at });
+      out.push({
+        ...live,
+        title: live.title ?? t.title,
+        created_at: live.created_at ?? t.created_at,
+        // Same turn still running: keep the start time we already had, in case
+        // the latest scan couldn't see it (long turns push it out of the log tail).
+        started_at: live.started_at ?? (t.ended_at == null ? t.started_at : null),
+      });
       running.delete(key);
     } else if (t.ended_at == null) {
       out.push({ ...t, ended_at: now }); // just finished
@@ -58,7 +65,22 @@ export function mergeTasks(prev: TrackedTask[], a: Activity, now: number): Track
     }
   }
   out.push(...running.values());
+  // Nothing changed: return the same array so React skips a re-render and
+  // nothing is written to storage (this runs every few seconds).
+  if (out.length === prev.length && out.every((t, i) => sameTask(t, prev[i]))) return prev;
   return out;
+}
+
+function sameTask(a: TrackedTask, b: TrackedTask): boolean {
+  return (
+    a.id === b.id &&
+    a.side === b.side &&
+    a.title === b.title &&
+    a.started_at === b.started_at &&
+    a.created_at === b.created_at &&
+    a.ended_at === b.ended_at &&
+    a.openable === b.openable
+  );
 }
 
 /** Running first (oldest turn on top), then finished (most recent first). */

@@ -47,13 +47,15 @@ const TAIL_BYTES: u64 = 256 * 1024;
 pub fn scan() -> Activity {
     let home = dirs::home_dir().unwrap_or_default();
     let desktop = desktop_sessions();
-    let claude_tasks = collect(&home.join(".claude/projects"), 2, |p| p.extension().is_some_and(|e| e == "jsonl"), |p, tail, _| {
+    let claude_tasks = collect(&CLAUDE_FILES, &home.join(".claude/projects"), 2, |p| p.extension().is_some_and(|e| e == "jsonl"), |p, tail, _| {
         let (title, started_at) = claude_task(tail)?;
         let id = p.file_stem().and_then(|s| s.to_str()).unwrap_or_default().to_string();
         let d = desktop.get(&id);
         Some(Task {
             title: d.and_then(|d| d.title.clone()).or(title),
-            started_at,
+            // A long turn can push the prompt out of the tail; the desktop
+            // app also records when the last message was sent.
+            started_at: started_at.or_else(|| d.and_then(|d| d.last_prompt_at)),
             created_at: d.and_then(|d| d.created_at).or_else(|| first_timestamp(p)),
             openable: d.is_some(),
             id,
@@ -61,6 +63,7 @@ pub fn scan() -> Activity {
     });
     let index = codex_index(&home.join(".codex/session_index.jsonl"));
     let codex_tasks = collect(
+        &CODEX_FILES,
         &home.join(".codex/sessions"),
         4,
         |p| p.file_name().and_then(|n| n.to_str()).is_some_and(|n| n.starts_with("rollout-") && n.ends_with(".jsonl")),
@@ -75,23 +78,49 @@ pub fn scan() -> Activity {
     Activity { claude: claude_tasks.len() as u32, codex: codex_tasks.len() as u32, claude_tasks, codex_tasks }
 }
 
-fn collect(root: &Path, depth: usize, want: impl Fn(&Path) -> bool, task: impl Fn(&Path, &str, bool) -> Option<Task>) -> Vec<Task> {
+type FileCache = std::sync::Mutex<Option<HashMap<std::path::PathBuf, (SystemTime, u64, bool, Option<Task>)>>>;
+static CLAUDE_FILES: FileCache = std::sync::Mutex::new(None);
+static CODEX_FILES: FileCache = std::sync::Mutex::new(None);
+
+/// Walks `root` for recently written session files. A file whose size and
+/// modification time haven't changed since the last scan isn't read again.
+fn collect(
+    cache: &FileCache,
+    root: &Path,
+    depth: usize,
+    want: impl Fn(&Path) -> bool,
+    task: impl Fn(&Path, &str, bool) -> Option<Task>,
+) -> Vec<Task> {
     let now = SystemTime::now();
     let mut out = Vec::new();
+    let mut guard = cache.lock().unwrap();
+    let cache = guard.get_or_insert_with(HashMap::new);
+    let mut seen = std::collections::HashSet::new();
     for e in walkdir::WalkDir::new(root).min_depth(depth).max_depth(depth).into_iter().flatten() {
         if !e.file_type().is_file() || !want(e.path()) {
             continue;
         }
-        let Ok(age) = std::fs::metadata(e.path()).and_then(|m| m.modified()).map(|m| now.duration_since(m).unwrap_or_default()) else { continue };
+        let Ok(meta) = std::fs::metadata(e.path()) else { continue };
+        let Ok(mtime) = meta.modified() else { continue };
+        let age = now.duration_since(mtime).unwrap_or_default();
         if age > STALE {
             continue;
         }
-        if let Some(tail) = read_tail(e.path()) {
-            if let Some(t) = task(e.path(), &tail, age < Duration::from_secs(120)) {
-                out.push(t);
+        let fresh = age < Duration::from_secs(120);
+        let path = e.path().to_path_buf();
+        seen.insert(path.clone());
+        let hit = cache.get(&path).filter(|(m, len, f, _)| *m == mtime && *len == meta.len() && *f == fresh);
+        let result = match hit {
+            Some((_, _, _, r)) => r.clone(),
+            None => {
+                let r = read_tail(e.path()).and_then(|tail| task(e.path(), &tail, fresh));
+                cache.insert(path, (mtime, meta.len(), fresh, r.clone()));
+                r
             }
-        }
+        };
+        out.extend(result);
     }
+    cache.retain(|p, _| seen.contains(p));
     // Oldest turn first, so the list order stays stable while tasks run.
     out.sort_by_key(|t| (t.started_at.unwrap_or(i64::MAX), t.id.clone()));
     out
@@ -232,6 +261,22 @@ pub fn codex_task(tail: &str, fresh: bool) -> Option<(Option<i64>, Option<String
 
 /// Unix ms of the first timestamped record (when the conversation was created).
 fn first_timestamp(p: &Path) -> Option<i64> {
+    // A conversation's creation time never changes, so remember it per file.
+    static SEEN: std::sync::Mutex<Option<HashMap<std::path::PathBuf, Option<i64>>>> = std::sync::Mutex::new(None);
+    let mut guard = SEEN.lock().unwrap();
+    let seen = guard.get_or_insert_with(HashMap::new);
+    if let Some(t) = seen.get(p) {
+        return *t;
+    }
+    let t = read_first_timestamp(p);
+    if seen.len() > 4096 {
+        seen.clear();
+    }
+    seen.insert(p.to_path_buf(), t);
+    t
+}
+
+fn read_first_timestamp(p: &Path) -> Option<i64> {
     use std::io::BufRead;
     let f = std::fs::File::open(p).ok()?;
     for line in std::io::BufReader::new(f).lines().take(20) {
@@ -255,6 +300,8 @@ struct DesktopSession {
     local_id: String,
     title: Option<String>,
     created_at: Option<i64>,
+    /// When the user last sent a message (the current turn's start).
+    last_prompt_at: Option<i64>,
 }
 
 /// Desktop sessions by Claude Code session id, cached by file modification time.
@@ -279,7 +326,12 @@ fn desktop_sessions() -> HashMap<String, DesktopSession> {
         let parsed = std::fs::read_to_string(p).ok().and_then(|t| serde_json::from_str::<Value>(&t).ok()).and_then(|v| {
             let local_id = v["sessionId"].as_str().filter(|s| valid_local_id(s))?.to_string();
             let cli = v["cliSessionId"].as_str()?.to_string();
-            Some((cli, DesktopSession { local_id, title: v["title"].as_str().and_then(|s| short(s, 80)), created_at: v["createdAt"].as_i64() }))
+            Some((cli, DesktopSession {
+                local_id,
+                title: v["title"].as_str().and_then(|s| short(s, 80)),
+                created_at: v["createdAt"].as_i64(),
+                last_prompt_at: v["latestUserFrameAt"].as_i64(),
+            }))
         });
         cache.insert(p.to_path_buf(), (mtime, parsed));
     }
@@ -308,12 +360,8 @@ pub fn open_task(provider: &str, id: &str) -> Result<(), String> {
         }
         _ => return Err("not_openable".into()),
     };
-    // `open` fails when no installed app handles the link.
-    let out = std::process::Command::new("/usr/bin/open").arg(url).output().map_err(|e| e.to_string())?;
-    if !out.status.success() {
-        return Err("app_missing".into());
-    }
-    Ok(())
+    // Fails when no installed app handles the link.
+    crate::platform::open_url(&url)
 }
 
 /// The Codex conversation still has a rollout file (live or archived).
@@ -334,7 +382,24 @@ fn codex_id(name: &str) -> Option<String> {
     rest.get(..36).map(String::from)
 }
 
+/// Codex thread names, re-read only when the index file changes.
 fn codex_index(path: &Path) -> HashMap<String, String> {
+    static CACHE: std::sync::Mutex<Option<(SystemTime, HashMap<String, String>)>> = std::sync::Mutex::new(None);
+    let mtime = std::fs::metadata(path).and_then(|m| m.modified()).ok();
+    let mut guard = CACHE.lock().unwrap();
+    if let (Some(m), Some((cm, map))) = (mtime, guard.as_ref()) {
+        if *cm == m {
+            return map.clone();
+        }
+    }
+    let map = read_codex_index(path);
+    if let Some(m) = mtime {
+        *guard = Some((m, map.clone()));
+    }
+    map
+}
+
+fn read_codex_index(path: &Path) -> HashMap<String, String> {
     let mut m = HashMap::new();
     let Ok(text) = std::fs::read_to_string(path) else { return m };
     for line in text.lines() {
@@ -399,6 +464,16 @@ mod tests {
         assert_eq!(open_task("claude", "00000000-0000-0000-0000-000000000000").unwrap_err(), "not_found");
         assert_eq!(open_task("openai", "../../etc").unwrap_err(), "not_openable");
         assert_eq!(open_task("other", "00000000-0000-0000-0000-000000000000").unwrap_err(), "not_openable");
+    }
+
+    #[test]
+    #[ignore]
+    fn bench_scan() {
+        for i in 0..3 {
+            let t = std::time::Instant::now();
+            let a = scan();
+            println!("scan {i}: {:?} ({} running)", t.elapsed(), a.claude + a.codex);
+        }
     }
 
     #[test]

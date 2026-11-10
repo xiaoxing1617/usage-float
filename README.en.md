@@ -4,17 +4,23 @@
 
 <p>
   <a href="https://github.com/xiaoxing1617/usage-float/stargazers"><img src="https://img.shields.io/github/stars/xiaoxing1617/usage-float?style=social" alt="GitHub stars"></a>
-  <img src="https://img.shields.io/badge/platform-macOS%2011%2B-black?logo=apple" alt="macOS 11+">
+  <img src="https://img.shields.io/badge/macOS-11%2B%20tested-black?logo=apple" alt="macOS 11+">
+  <img src="https://img.shields.io/badge/Windows-10%2F11%20beta-0078D4?logo=windows" alt="Windows 10/11 beta">
   <a href="LICENSE"><img src="https://img.shields.io/github/license/xiaoxing1617/usage-float" alt="MIT"></a>
 </p>
 
-> ⭐ **If this little tool helps you, please give it a Star (top right)!** Every star keeps me going and helps others find it.
+> ⭐ **If this little tool helps you, please give it a Star (top right)!** Every star keeps me going and helps others find it. You can also [buy me a coffee ☕](#support-the-author).
 
 
 A small floating widget for your Mac desktop that keeps your **Claude** and **ChatGPT (Codex)** usage in view: remaining quota, reset times, plan, usage by period, and what it would cost at API prices (USD / CNY / JPY / SGD / EUR).
 
 > [!IMPORTANT]
-> **macOS only** (macOS 11 Big Sur or later, Apple silicon or Intel). Windows, Linux, iPhone and iPad are not supported.
+> | Platform | Status |
+> | --- | --- |
+> | **macOS** 11 Big Sur or later (Apple silicon / Intel) | ✅ **Tested by the developer, in daily use** |
+> | **Windows** 10 / 11 (64-bit) | 🧪 **Installers provided, not yet verified**: the code supports Windows and GitHub builds it automatically, but the developer hasn't tested it on a Windows PC yet. Please report problems in [Issues](https://github.com/xiaoxing1617/usage-float/issues) |
+>
+> Linux, iPhone, iPad and Android are not supported.
 
 <p align="center">
   <img src="docs/panel.jpg" width="340" alt="Panel">
@@ -41,17 +47,17 @@ A small floating widget for your Mac desktop that keeps your **Claude** and **Ch
 
 | | |
 | --- | --- |
-| Computer | A Mac with Apple silicon (M1 or later) or Intel |
-| System | macOS 11 Big Sur or later |
+| Computer | A Mac with Apple silicon (M1 or later) or Intel; or a 64-bit Windows PC (not yet verified) |
+| System | macOS 11 Big Sur or later; Windows 10 / 11 (needs WebView2, built into Windows 11 and usually present on Windows 10) |
 | Usage data | [Claude Code](https://docs.claude.com/en/docs/claude-code) (CLI / IDE extension) and/or [Codex](https://github.com/openai/codex) used on this Mac. The widget reads the logs they keep locally |
-| To build from source | Xcode Command Line Tools, Rust 1.77.2+, Node.js 20.19+ or 22.12+; about 3 GB of disk space and 5–15 minutes for the first build |
+| To build from source | Rust 1.77.2+, Node.js 20.19+ or 22.12+; Xcode Command Line Tools on Mac, Visual Studio Build Tools ("Desktop development with C++") on Windows; about 3 GB of disk space and 5–15 minutes for the first build |
 
 > [!NOTE]
 > Only usage from **Claude Code** and **Codex** is counted. Chats on claude.ai, the Claude desktop app or ChatGPT aren't written to local logs, so they are not in the stats (they share the same quota, though, so the quota percentages are accurate).
 
 ## Install
 
-### Option 1: one sentence to your AI agent (recommended)
+### Option 1: one sentence to your AI agent (recommended, Mac)
 
 If **Claude Code** or **Codex** is already on your Mac, run `claude` or `codex` in Terminal and send it this:
 
@@ -96,17 +102,25 @@ When it's done, the widget's icon appears in the menu bar.
 
 ### Option 3: download a build
 
-Download the latest `Usage-Float_x.y.z_universal.dmg` (Apple silicon and Intel) from [Releases](https://github.com/xiaoxing1617/usage-float/releases/latest), open it and drag the app into Applications. This is the easiest way if you don't want to install developer tools.
+Download the latest version from [Releases](https://github.com/xiaoxing1617/usage-float/releases/latest). This is the easiest way if you don't want to install developer tools.
 
-The app isn't signed with an Apple Developer ID, so macOS blocks it the first time. To open it: in Finder, **right-click the app → Open → Open**. If there's no Open button, go to **System Settings → Privacy & Security**, scroll down and click **Open Anyway**.
+| Computer | File to download |
+| --- | --- |
+| Mac | `Usage-Float_x.y.z_universal.dmg` (Apple silicon and Intel); open it and drag the app into Applications |
+| Windows (not yet verified) | `Usage.Float_x.y.z_x64-setup.exe` (recommended) or `Usage.Float_x.y.z_x64_en-US.msi`; double-click to install |
+
+The app isn't signed, so the system blocks it the first time:
+
+- **Mac**: in Finder, **right-click the app → Open → Open**. If there's no Open button, go to **System Settings → Privacy & Security**, scroll down and click **Open Anyway**.
+- **Windows**: when you see "Windows protected your PC", click **More info → Run anyway**.
 
 ## Usage
 
-- **Show / hide**: click the menu bar icon. The app has no Dock icon.
+- **Show / hide**: click the menu bar icon (the system tray icon on Windows). The app has no Dock / taskbar icon.
 - **Move**: drag the title bar; drag the ball directly.
 - **Red dot (top left)**: hide the widget (reopen it from the menu bar icon).
 - **Top right**: `↻ Refresh`, `⚙ Settings`, `● Ball`.
-- **Start at login**: add Usage Float under **System Settings → General → Login Items**.
+- **Start at login**: on Mac, add Usage Float under **System Settings → General → Login Items**; on Windows, press `Win + R`, type `shell:startup` and put a Usage Float shortcut there.
 
 ### Where the Claude quota comes from
 
@@ -150,15 +164,23 @@ Files it writes on your Mac:
 
 - `~/.claude/settings.json` (only when you connect the status line; backed up first to `settings.json.usage-float.bak`)
 - `~/.claude/usage-float/` (the status line script and the latest quota data)
-- `~/Library/Application Support/com.usagefloat.app/` (price history, cache)
+- `~/Library/Application Support/com.usagefloat.app/` (price history, cache; `%APPDATA%\com.usagefloat.app\` on Windows)
 
 The running-conversation count only reads the end of log files in `~/.claude/projects` and `~/.codex/sessions` written in the last few minutes, to tell whether a conversation has finished. Nothing is uploaded.
+
+## Support the author
+
+This project is free and open source, built in my spare time. If it saves you time and you'd like to support it, you can buy me a coffee ☕ by scanning the Alipay or WeChat Pay code below. Any amount is welcome and it's **entirely optional**: every feature works without it, and a ⭐ Star is a big encouragement too.
+
+<p align="center">
+  <img src="docs/donate.jpg" width="560" alt="Alipay / WeChat Pay tip QR codes">
+</p>
 
 ## Uninstall
 
 1. If you connected the status line, click **Disconnect** in Settings first.
-2. Quit the app (menu bar icon → Quit) and delete `/Applications/Usage Float.app`.
-3. Optional: delete `~/.claude/usage-float/` and `~/Library/Application Support/com.usagefloat.app/`.
+2. Quit the app (menu bar / system tray icon → Quit). On Mac, delete `/Applications/Usage Float.app`; on Windows, uninstall Usage Float in **Settings → Apps**.
+3. Optional: delete `~/.claude/usage-float/` and `~/Library/Application Support/com.usagefloat.app/` (`%APPDATA%\com.usagefloat.app\` on Windows).
 
 ## Development
 
@@ -171,6 +193,8 @@ cd src-tauri && cargo test
 ```
 
 Stack: Tauri 2 · Rust · React · TypeScript.
+
+The Windows installers are built by GitHub Actions ([`.github/workflows/windows.yml`](.github/workflows/windows.yml)) on GitHub's Windows machines: every version tag (`v*`) attaches the `.exe` and `.msi` to its Release, and it can also be run by hand from the Actions tab.
 
 ## Changelog
 

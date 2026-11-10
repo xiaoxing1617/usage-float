@@ -85,7 +85,9 @@ fn write_settings(v: &Value) -> Result<(), String> {
 }
 
 fn our_command() -> String {
-    format!("sh \"{}\"", script_path().display())
+    // Claude Code runs status lines with sh (Git Bash on Windows), which
+    // takes forward slashes on every platform.
+    format!("sh \"{}\"", script_path().display().to_string().replace('\\', "/"))
 }
 
 fn is_ours(v: &Value) -> bool {

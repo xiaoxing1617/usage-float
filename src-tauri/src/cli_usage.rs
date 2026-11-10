@@ -59,21 +59,7 @@ fn now_ms() -> i64 {
 /// Finds the `claude` executable. GUI apps don't get the shell's PATH, so we
 /// check the usual install locations, then ask the login shell.
 fn find_claude() -> Option<PathBuf> {
-    let home = dirs::home_dir().unwrap_or_default();
-    let candidates = [
-        home.join(".local/bin/claude"),
-        home.join(".claude/local/claude"),
-        PathBuf::from("/opt/homebrew/bin/claude"),
-        PathBuf::from("/usr/local/bin/claude"),
-        home.join(".npm-global/bin/claude"),
-        home.join(".bun/bin/claude"),
-    ];
-    if let Some(p) = candidates.into_iter().find(|p| p.is_file()) {
-        return Some(p);
-    }
-    let out = std::process::Command::new("/bin/zsh").args(["-lc", "command -v claude"]).output().ok()?;
-    let p = PathBuf::from(String::from_utf8_lossy(&out.stdout).trim());
-    p.is_absolute().then_some(p).filter(|p| p.is_file())
+    crate::platform::claude_candidates().into_iter().find(|p| p.is_file()).or_else(crate::platform::which_claude)
 }
 
 pub async fn fetch(cache: &CliCache, force: bool) -> CliUsage {
@@ -104,7 +90,7 @@ fn run() -> Result<Vec<QuotaWindow>, String> {
     let bin = find_claude().ok_or("not_installed")?;
     // A neutral working directory: no project settings or CLAUDE.md get loaded.
     let cwd = std::env::temp_dir();
-    let mut child = std::process::Command::new(bin)
+    let mut child = crate::platform::command_for(&bin)
         .args(["-p", "/usage", "--no-session-persistence", "--output-format", "json", "--strict-mcp-config"])
         .current_dir(cwd)
         .stdin(std::process::Stdio::null())

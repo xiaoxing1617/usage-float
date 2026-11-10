@@ -4,17 +4,23 @@
 
 <p>
   <a href="https://github.com/xiaoxing1617/usage-float/stargazers"><img src="https://img.shields.io/github/stars/xiaoxing1617/usage-float?style=social" alt="GitHub stars"></a>
-  <img src="https://img.shields.io/badge/platform-macOS%2011%2B-black?logo=apple" alt="macOS 11+">
+  <img src="https://img.shields.io/badge/macOS-11%2B%20tested-black?logo=apple" alt="macOS 11+">
+  <img src="https://img.shields.io/badge/Windows-10%2F11%20beta-0078D4?logo=windows" alt="Windows 10/11 beta">
   <a href="LICENSE"><img src="https://img.shields.io/github/license/xiaoxing1617/usage-float" alt="MIT"></a>
 </p>
 
-> ⭐ **如果这个小工具对你有帮助，请点一下右上角的 Star 支持一下！** 你的每一个 Star 都是我继续更新的动力，也能让更多人发现它。
+> ⭐ **如果这个小工具对你有帮助，请点一下右上角的 Star 支持一下！** 你的每一个 Star 都是我继续更新的动力，也能让更多人发现它。也可以[请作者喝杯咖啡 ☕](#支持作者)。
 
 
 一个常驻在 Mac 桌面上的小浮窗，帮你随时看到 **Claude** 和 **ChatGPT（Codex）** 的用量：还剩多少额度、什么时候重置、会员等级、按时间段统计的用量，以及折合多少钱（美元 / 人民币 / 日元 / 新币 / 欧元）。
 
 > [!IMPORTANT]
-> **只支持 macOS**（macOS 11 Big Sur 或更新，Apple 芯片和 Intel 都可以）。不支持 Windows、Linux、iPhone、iPad。
+> | 平台 | 状态 |
+> | --- | --- |
+> | **macOS** 11 Big Sur 或更新（Apple 芯片 / Intel） | ✅ **开发者亲测，日常在用** |
+> | **Windows** 10 / 11（64 位） | 🧪 **已提供安装包，有待验证**：代码已适配，由 GitHub 云端自动编译，但开发者还没有在 Windows 电脑上实际测试过。遇到问题欢迎提 [Issue](https://github.com/xiaoxing1617/usage-float/issues) |
+>
+> 不支持 Linux、iPhone、iPad、安卓。
 
 <p align="center">
   <img src="docs/panel.jpg" width="340" alt="面板">
@@ -41,17 +47,17 @@
 
 | 项目 | 要求 |
 | --- | --- |
-| 电脑 | Mac（Apple 芯片 M1 及以后，或 Intel） |
-| 系统 | macOS 11 Big Sur 或更新 |
+| 电脑 | Mac（Apple 芯片 M1 及以后，或 Intel）；或 64 位 Windows 电脑（有待验证） |
+| 系统 | macOS 11 Big Sur 或更新；Windows 10 / 11（需要 WebView2，Windows 11 自带，Windows 10 一般也已装好） |
 | 用量数据 | 这台 Mac 上用过 [Claude Code](https://docs.claude.com/en/docs/claude-code)（命令行 / IDE 插件）和 / 或 [Codex](https://github.com/openai/codex)。浮窗读取它们留在本机的记录 |
-| 从源码安装时 | Xcode 命令行工具、Rust 1.77.2+、Node.js 20.19+ 或 22.12+；约 3 GB 磁盘空间，首次编译约 5–15 分钟 |
+| 从源码安装时 | Rust 1.77.2+、Node.js 20.19+ 或 22.12+；Mac 需要 Xcode 命令行工具，Windows 需要 Visual Studio 生成工具（“使用 C++ 的桌面开发”）；约 3 GB 磁盘空间，首次编译约 5–15 分钟 |
 
 > [!NOTE]
 > 只统计 **Claude Code** 和 **Codex** 产生的用量。claude.ai 网页、Claude 桌面版、ChatGPT 网页 / App 的对话不会写到本机记录里，所以不计入统计（但它们和 Claude Code 共用同一份额度，额度百分比是准的）。
 
 ## 安装
 
-### 方法一：一句话让 AI 帮你装（推荐）
+### 方法一：一句话让 AI 帮你装（推荐，Mac）
 
 如果你的 Mac 上已经装了 **Claude Code** 或 **Codex**，打开终端运行 `claude` 或 `codex`，把下面这段话发给它：
 
@@ -96,17 +102,25 @@
 
 ### 方法三：下载安装包
 
-到 [Releases](https://github.com/xiaoxing1617/usage-float/releases/latest) 下载最新的 `Usage-Float_x.y.z_universal.dmg`（Apple 芯片和 Intel 通用），打开后把 app 拖进“应用程序”。不想装开发工具的话，这是最简单的方式。
+到 [Releases](https://github.com/xiaoxing1617/usage-float/releases/latest) 下载最新版本。不想装开发工具的话，这是最简单的方式。
 
-这个 app 没有 Apple 开发者签名，第一次打开时 macOS 会拦截。处理方法：在 Finder 里**右键点 app → 打开 → 打开**；如果没有“打开”按钮，去“系统设置 → 隐私与安全性”，往下找到它点“仍要打开”。
+| 电脑 | 下载哪个文件 |
+| --- | --- |
+| Mac | `Usage-Float_x.y.z_universal.dmg`（Apple 芯片和 Intel 通用），打开后把 app 拖进“应用程序” |
+| Windows（有待验证） | `Usage.Float_x.y.z_x64-setup.exe`（推荐）或 `Usage.Float_x.y.z_x64_en-US.msi`，双击安装 |
+
+这个 app 没有开发者签名，第一次打开时系统会拦截：
+
+- **Mac**：在 Finder 里**右键点 app → 打开 → 打开**；如果没有“打开”按钮，去“系统设置 → 隐私与安全性”，往下找到它点“仍要打开”。
+- **Windows**：出现“Windows 已保护你的电脑”时，点 **更多信息 → 仍要运行**。
 
 ## 使用
 
-- **显示 / 隐藏**：点菜单栏的图标。app 不在程序坞里显示。
+- **显示 / 隐藏**：点菜单栏的图标（Windows 上是右下角系统托盘的图标）。app 不在程序坞 / 任务栏里显示。
 - **移动**：按住标题栏拖动；悬浮球直接按住拖动。
 - **左上角红点**：隐藏浮窗（从菜单栏图标重新打开）。
 - **右上角**：`↻ 刷新`、`⚙ 设置`、`● 悬浮球`。
-- **开机自动启动**：“系统设置 → 通用 → 登录项”里添加 Usage Float。
+- **开机自动启动**：Mac 在“系统设置 → 通用 → 登录项”里添加 Usage Float；Windows 按 `Win + R` 输入 `shell:startup`，把 Usage Float 的快捷方式放进去。
 
 ### Claude 额度从哪里来
 
@@ -150,15 +164,23 @@ ChatGPT 的额度会直接从 Codex 记录里读到。Claude 的额度默认这�
 
 - `~/.claude/settings.json`（只在你点“连接状态栏”时修改，修改前备份为 `settings.json.usage-float.bak`）
 - `~/.claude/usage-float/`（状态栏脚本和最新额度数据）
-- `~/Library/Application Support/com.usagefloat.app/`（价格历史、缓存）
+- `~/Library/Application Support/com.usagefloat.app/`（价格历史、缓存；Windows 上是 `%APPDATA%\com.usagefloat.app\`）
 
 “正在进行的对话”只读取 `~/.claude/projects` 和 `~/.codex/sessions` 里最近几分钟写过的记录文件的末尾，用来判断对话是否结束，不会上传任何内容。
+
+## 支持作者
+
+这个项目完全免费、开源，是我利用业余时间做的。如果它帮你省了时间、你也愿意支持一下，可以用支付宝或微信扫码请我喝杯咖啡 ☕。金额随意，**完全自愿**，不打赏也能正常使用全部功能；点一个 ⭐ Star 同样是很大的鼓励。
+
+<p align="center">
+  <img src="docs/donate.jpg" width="560" alt="支付宝 / 微信扫码打赏">
+</p>
 
 ## 卸载
 
 1. 如果连接过状态栏，先在设置里点 **断开**。
-2. 退出 app（菜单栏图标 → Quit），删除 `/Applications/Usage Float.app`。
-3. 可选：删除 `~/.claude/usage-float/` 和 `~/Library/Application Support/com.usagefloat.app/`。
+2. 退出 app（菜单栏 / 系统托盘图标 → Quit）。Mac 删除 `/Applications/Usage Float.app`；Windows 在“设置 → 应用”里卸载 Usage Float。
+3. 可选：删除 `~/.claude/usage-float/`，以及 `~/Library/Application Support/com.usagefloat.app/`（Windows 上是 `%APPDATA%\com.usagefloat.app\`）。
 
 ## 开发
 
@@ -171,6 +193,8 @@ cd src-tauri && cargo test
 ```
 
 技术栈：Tauri 2 · Rust · React · TypeScript。
+
+Windows 安装包由 GitHub Actions（[`.github/workflows/windows.yml`](.github/workflows/windows.yml)）在 Windows 云端机器上自动编译：每次发布版本标签（`v*`）都会把 `.exe` 和 `.msi` 附加到对应的 Release，也可以在 Actions 页面手动运行。
 
 ## 更新日志
 
