@@ -37,7 +37,7 @@ A small floating widget for your Mac desktop that keeps your **Claude** and **Ch
 - **Usage stats**: today, yesterday, this week, last week, this month, last month, last 7 days, last 30 days, or a custom range; broken down by model and by day.
 - **Cost estimate (optional)**: with "Fetch model prices automatically" on, prices are refreshed every 12 hours from the [LiteLLM price table](https://github.com/BerriAI/litellm). Every price change is kept, and each usage event is priced at the rate **in effect at that time** (if a model cost $5 yesterday and $3 today, each day is priced separately). With it off, no cost is shown.
 - **Currencies**: USD, CNY, JPY, SGD, EUR, with ECB rates from [Frankfurter](https://frankfurter.dev).
-- **Floating ball**: shrink to a small ball, Claude on the left and ChatGPT on the right; the outer ring is the 5-hour quota, the inner ring the weekly quota. Click to expand, drag to move. While a conversation is running, a badge shows how many Claude Code / Codex conversations are in progress, with a soft ripple. A bubble beside the ball lists each task's title and how long it has been running; click Collapse at the bottom to hide it and the number to bring it back (remembered separately for Claude and ChatGPT). Finished tasks stay under "Finished" until you remove them with ×; click a title to open that conversation (Codex and the Claude desktop app).
+- **Floating ball**: shrink to a small ball, Claude on the left and ChatGPT on the right; the outer ring is the 5-hour quota, the inner ring the weekly quota. Click to expand, drag to move. While a conversation is running, a badge shows how many Claude Code / Codex conversations are in progress, with a soft ripple. A bubble beside the ball lists each task's title and how long it has been running; click Collapse at the bottom to hide it and the number to bring it back (remembered separately for Claude and ChatGPT). Finished tasks stay under "Finished" until you remove them with ×; click a task row to open that conversation (Codex and the Claude desktop app).
 - **Public IP**: the egress IP websites see, with country and state/province (in the UI language).
 - **IP trust score & latency**: a 🛡 score (0–100, red to green) and latency in ms next to the Claude and ChatGPT names. Click the score for the full IP check; click the latency to see how it is measured.
 - **Three languages**: English, 简体中文, 繁體中文. Picked from the system language on first launch, falling back to English; change it in Settings.
@@ -120,6 +120,7 @@ The app isn't signed, so the system blocks it the first time:
 - **Move**: drag the title bar; drag the ball directly.
 - **Red dot (top left)**: hide the widget (reopen it from the menu bar icon).
 - **Top right**: `↻ Refresh`, `⚙ Settings`, `● Ball`.
+- **Updates**: the top of Settings shows the current version and the GitHub repository. Click **Check for updates**; when a new version is out, **Update now** downloads it, installs it and restarts the app (checked automatically twice a day; you can turn this off).
 - **Start at login**: on Mac, add Usage Float under **System Settings → General → Login Items**; on Windows, press `Win + R`, type `shell:startup` and put a Usage Float shortcut there.
 
 ### Where the Claude quota comes from
@@ -174,6 +175,20 @@ This project is free and open source, built in my spare time. If it saves you ti
 
 <p align="center">
   <img src="docs/donate.jpg" width="560" alt="Alipay / WeChat Pay tip QR codes">
+</p>
+
+## Join the community
+
+Want to swap tips on Claude Code, Codex and AI-assisted coding, report a problem, suggest a feature, or just meet other people who like tinkering? Scan the code to add me on WeChat and I'll invite you to a group 👇
+
+- 💬 **Tech chat**: Usage Float questions, bug reports, feature ideas, and first word on new versions
+- 🚀 **Power users**: AI coding, indie development and productivity tools, with real-world experience and new tricks
+- 📚 **Learning group**: new to Claude, ChatGPT or AI coding? Learn together and help each other out
+
+> When you send the friend request, **say why you're adding me**, e.g. "Usage Float + tech chat" or "Usage Float + learning", so I can accept and add you to the right group. Requests without a note may be ignored as spam. No ads or self-promotion in the groups, please 🙌
+
+<p align="center">
+  <img src="docs/wechat.jpg" width="300" alt="Scan with WeChat to add me and join a group">
 </p>
 
 ## Uninstall

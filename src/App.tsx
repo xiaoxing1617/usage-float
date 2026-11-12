@@ -40,6 +40,15 @@ import { CURRENCIES, formatMoney, loadRates, type Currency, type Rates } from ".
 import { DICTS, LANGS, detectLang, fmt, intlLocale, type Dict, type Lang } from "./i18n";
 import { PERIODS, daysIn, rangeFor, ymd, type PeriodId, type Range } from "./periods";
 import { clock, loadTasks, mergeTasks, relTime, saveTasks, sortTasks, type Side, type TrackedTask } from "./tasks";
+import {
+  REPO,
+  REPO_URL,
+  RELEASES_URL,
+  checkForUpdate,
+  currentVersion,
+  installUpdate,
+  type UpdateState,
+} from "./update";
 import "./App.css";
 
 // ---------- settings (per-viewer convenience; safe defaults if storage fails) ----------
@@ -60,6 +69,8 @@ interface Settings {
   alwaysOnTop: boolean;
   showIp: boolean;
   netCheck: boolean;
+  /** Look for a new release on startup and twice a day. */
+  autoUpdate: boolean;
   weekStart: 0 | 1;
   period: PeriodId;
   custom: Range;
@@ -88,6 +99,7 @@ function loadSettings(): Settings {
     alwaysOnTop: true,
     showIp: true,
     netCheck: true,
+    autoUpdate: true,
     weekStart: 1,
     period: "today",
     custom: { start: today, end: today },
@@ -173,6 +185,34 @@ export default function App() {
   const [slBusy, setSlBusy] = useState(false);
   const [slError, setSlError] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
+
+  // New version: checked quietly in the background; shown in settings.
+  const [upd, setUpd] = useState<UpdateState>({ phase: "idle", current: "" });
+  const runCheck = useCallback(async () => {
+    const current = await currentVersion();
+    setUpd((u) => (u.phase === "downloading" || u.phase === "installing" ? u : { ...u, phase: "checking", current }));
+    const r = await checkForUpdate(current);
+    setUpd((u) => (u.phase === "downloading" || u.phase === "installing" ? u : r));
+  }, []);
+  useEffect(() => {
+    currentVersion().then((current) => setUpd((u) => ({ ...u, current })));
+  }, []);
+  useEffect(() => {
+    if (!s.autoUpdate) return;
+    const first = setTimeout(runCheck, 8_000);
+    const id = setInterval(runCheck, 12 * 3600_000);
+    return () => {
+      clearTimeout(first);
+      clearInterval(id);
+    };
+  }, [s.autoUpdate, runCheck]);
+  const runInstall = useCallback(() => {
+    if (upd.auto) {
+      installUpdate((p) => setUpd((u) => ({ ...u, ...p }))).catch((e) =>
+        setUpd((u) => ({ ...u, phase: "error", error: String(e) })),
+      );
+    } else openLink(RELEASES_URL);
+  }, [upd.auto]);
 
   const withCost = s.autoPrices && (prices?.snapshots ?? 0) > 0;
 
@@ -459,6 +499,9 @@ export default function App() {
           )}
           <button className="tbtn" onClick={() => setView(view === "main" ? "settings" : "main")}>
             <span className="ico">{view === "main" ? "⚙" : "←"}</span>
+            {view === "main" && upd.phase === "available" && (
+              <span className="newdot" title={fmt(t.updAvailable, { v: upd.latest ?? "" })} />
+            )}
             {view === "main" ? t.settings : t.back}
           </button>
           <button className="tbtn" title={t.ball} onClick={() => setMode("ball")}>
@@ -482,6 +525,9 @@ export default function App() {
           slBusy={slBusy}
           slError={slError}
           onStatusline={setStatusline}
+          upd={upd}
+          onCheckUpdate={runCheck}
+          onInstallUpdate={runInstall}
         />
       ) : (
         <main className="scroll">
@@ -1276,7 +1322,25 @@ function TaskBubble(props: {
                   <span>{t.taskDoneSection}</span>
                 </li>
               )}
-              <li className={"task" + (live ? " live" : " done") + (err?.id === task.id ? " err" : "")} style={{ animationDelay: `${40 + i * 40}ms` }}>
+              <li
+                className={
+                  "task" +
+                  (live ? " live" : " done") +
+                  (task.openable ? " link" : "") +
+                  (err?.id === task.id ? " err" : "")
+                }
+                style={{ animationDelay: `${40 + i * 40}ms` }}
+                role={task.openable ? "button" : undefined}
+                tabIndex={task.openable ? 0 : undefined}
+                title={task.openable ? `${title}\n${t.taskOpen}` : title}
+                onClick={() => open(task)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    open(task);
+                  }
+                }}
+              >
                 <span className="tstate" aria-hidden="true">
                   {live ? (
                     <span className="eq">
@@ -1293,21 +1357,17 @@ function TaskBubble(props: {
                 </span>
                 <span className="tbody">
                   <span className="trow">
-                    {task.openable ? (
-                      <button className="ttitle link" title={`${title}\n${t.taskOpen}`} onClick={() => open(task)}>
-                        {title}
-                      </button>
-                    ) : (
-                      <span className="ttitle" title={title}>
-                        {title}
-                      </span>
-                    )}
+                    <span className="ttitle">{title}</span>
                     {!live && (
                       <button
                         className="tx"
                         title={t.taskRemove}
                         aria-label={t.taskRemove}
-                        onClick={() => onRemove(task.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onRemove(task.id);
+                        }}
+                        onKeyDown={(e) => e.stopPropagation()}
                       >
                         <svg viewBox="0 0 10 10" width="8" height="8" aria-hidden="true">
                           <path d="M2 2l6 6M8 2 2 8" />
@@ -1566,8 +1626,27 @@ function SettingsView(props: {
   slBusy: boolean;
   slError: string | null;
   onStatusline: (connect: boolean) => void;
+  upd: UpdateState;
+  onCheckUpdate: () => void;
+  onInstallUpdate: () => void;
 }) {
   const { t, s, update, prices, pricesBusy, onFetchPrices, rates, locale, sl, slBusy, slError, onStatusline } = props;
+  const { upd, onCheckUpdate, onInstallUpdate } = props;
+  const busy = upd.phase === "checking" || upd.phase === "downloading" || upd.phase === "installing";
+  const updText =
+    upd.phase === "checking"
+      ? t.updChecking
+      : upd.phase === "latest"
+        ? t.updLatest
+        : upd.phase === "available"
+          ? fmt(t.updAvailable, { v: upd.latest ?? "" })
+          : upd.phase === "downloading"
+            ? fmt(t.updDownloading, { p: upd.progress != null ? Math.round(upd.progress * 100) + "%" : "…" })
+            : upd.phase === "installing"
+              ? t.updInstalling
+              : upd.phase === "error"
+                ? t.updError
+                : "";
   const dt = (ms: number) =>
     new Date(ms).toLocaleString(locale, {
       month: "short",
@@ -1577,6 +1656,52 @@ function SettingsView(props: {
     });
   return (
     <main className="scroll settings">
+      <section className={"card about" + (upd.phase === "available" ? " has-update" : "")}>
+        <div className="row">
+          <span className="sub nowrap">
+            {t.appName} <span className="ver">v{upd.current || "…"}</span>
+          </span>
+          {upd.phase === "available" ? (
+            <button className="btn primary" onClick={onInstallUpdate}>
+              {upd.auto ? t.updInstall : t.updDownload}
+            </button>
+          ) : (
+            <button className="btn" disabled={busy} onClick={onCheckUpdate}>
+              {busy ? "…" : t.updCheck}
+            </button>
+          )}
+        </div>
+        {(updText || upd.phase === "idle") && (
+          <div className="updline">
+            <span
+              className={"tiny " + (upd.phase === "available" ? "updnew" : upd.phase === "error" ? "warn" : "muted")}
+            >
+              {updText || t.updIdle}
+            </span>
+          </div>
+        )}
+        {upd.phase === "downloading" && (
+          <div className="updbar">
+            <i style={{ width: `${Math.round((upd.progress ?? 0.05) * 100)}%` }} />
+          </div>
+        )}
+        {upd.phase === "error" && (
+          <button className="linkish tiny" onClick={() => openLink(RELEASES_URL)}>
+            {t.updOpenPage}
+          </button>
+        )}
+        <Toggle label={t.updAuto} on={s.autoUpdate} onChange={(v) => update({ autoUpdate: v })} />
+        <button className="btn link repo" title={REPO_URL} onClick={() => openLink(REPO_URL)}>
+          <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">
+            <path
+              fill="currentColor"
+              d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"
+            />
+          </svg>
+          {REPO}
+        </button>
+      </section>
+
       <section className="card">
         <label className="row">
           <span>{t.language}</span>
@@ -1691,4 +1816,9 @@ function Toggle({ label, on, onChange }: { label: string; on: boolean; onChange:
       <input type="checkbox" role="switch" checked={on} onChange={(e) => onChange(e.target.checked)} />
     </label>
   );
+}
+
+function openLink(url: string) {
+  if (isTauri()) openUrl(url).catch(() => {});
+  else window.open(url, "_blank");
 }

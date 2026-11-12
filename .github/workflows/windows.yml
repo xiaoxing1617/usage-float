@@ -1,6 +1,11 @@
 # Builds the Windows installers on GitHub's Windows machines.
 # Runs for every release tag (v*) and can be started by hand from the Actions tab.
-# For a tag, the installers are attached to the GitHub Release with that tag.
+# For a tag, the installers are attached to the GitHub Release with that tag,
+# and the in-app updater manifest (latest.json) is written for that release.
+#
+# One-click updates need the updater signing key as the repository secret
+# TAURI_SIGNING_PRIVATE_KEY. Without it the installers are still built, and the
+# app only points Windows users to the release page for new versions.
 name: Windows build
 
 on:
@@ -36,7 +41,17 @@ jobs:
         run: cargo test
 
       - name: Build installers (.exe and .msi)
-        run: npm run tauri build -- --bundles nsis,msi
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
+        run: |
+          if [ -n "$TAURI_SIGNING_PRIVATE_KEY" ]; then
+            npm run tauri build -- --bundles nsis,msi
+          else
+            echo "No signing key: building without updater signatures."
+            npm run tauri build -- --bundles nsis,msi --config '{"bundle":{"createUpdaterArtifacts":false}}'
+          fi
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
@@ -52,7 +67,25 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          shopt -s nullglob
           gh release upload "$GITHUB_REF_NAME" \
             src-tauri/target/release/bundle/nsis/*.exe \
+            src-tauri/target/release/bundle/nsis/*.exe.sig \
             src-tauri/target/release/bundle/msi/*.msi \
             --clobber
+
+      - name: Write updater manifest (latest.json)
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p sigs
+          # Use the names GitHub gave the assets. The Mac signature is uploaded with the
+          # release; wait for it a little.
+          for i in $(seq 1 20); do
+            gh release download "$GITHUB_REF_NAME" -p '*.sig' -D sigs --clobber && ls sigs/*.app.tar.gz.sig >/dev/null 2>&1 && break
+            sleep 30
+          done
+          node scripts/latest-json.mjs "${GITHUB_REF_NAME#v}" sigs latest.json
+          gh release upload "$GITHUB_REF_NAME" latest.json --clobber

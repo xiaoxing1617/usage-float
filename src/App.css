@@ -784,8 +784,8 @@ input {
   padding: 6px 6px 6px 5px;
   border-radius: 9px;
   border: 1px solid transparent;
-  animation: task-in 0.36s cubic-bezier(0.22, 0.61, 0.36, 1) both;
-  transition: background 0.25s ease, opacity 0.25s ease;
+  animation: task-in 0.36s cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
+  transition: background 0.25s ease, border-color 0.2s ease, opacity 0.25s ease, transform 0.12s ease;
 }
 .task + .task {
   margin-top: 3px;
@@ -894,17 +894,25 @@ input {
   font-weight: 500;
   color: var(--muted);
 }
-button.ttitle {
-  padding: 0;
-  border: 0;
-  background: none;
-  font-family: inherit;
+/* openable rows: the whole card is the click target */
+.task.link {
   cursor: pointer;
+  outline: none;
 }
-button.ttitle:hover {
+.task.link:hover,
+.task.link:focus-visible {
+  border-color: color-mix(in srgb, var(--side) 34%, transparent);
+}
+.task.live.link:hover,
+.task.live.link:focus-visible {
+  background: color-mix(in srgb, var(--side) 13%, transparent);
+}
+.task.link:hover .ttitle,
+.task.link:focus-visible .ttitle {
   color: var(--side);
-  text-decoration: underline;
-  text-underline-offset: 2px;
+}
+.task.link:active {
+  transform: scale(0.985);
 }
 .tx {
   flex: none;
@@ -1445,4 +1453,76 @@ button.ttitle:hover {
 }
 .iprow .ipaddr {
   flex-shrink: 0;
+}
+
+/* about / update card */
+.tbtn .ico {
+  position: relative;
+}
+.newdot {
+  position: relative;
+  width: 6px;
+  height: 6px;
+  margin: 0 1px 0 -2px;
+  align-self: flex-start;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: var(--crit);
+  box-shadow: 0 0 0 2px var(--bg-solid);
+}
+.about .ver {
+  margin-left: 4px;
+  font-weight: 500;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.btn.link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text);
+}
+.btn.link:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.about.has-update {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+}
+.updnew {
+  color: var(--accent);
+  font-weight: 600;
+}
+.updbar {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--chip);
+  overflow: hidden;
+}
+.updbar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width 0.3s ease;
+}
+.linkish {
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.nowrap {
+  white-space: nowrap;
+}
+.btn.link.repo {
+  align-self: flex-start;
+  max-width: 100%;
 }
