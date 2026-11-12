@@ -7,6 +7,7 @@
   <img src="https://img.shields.io/badge/macOS-11%2B%20tested-black?logo=apple" alt="macOS 11+">
   <img src="https://img.shields.io/badge/Windows-10%2F11%20beta-0078D4?logo=windows" alt="Windows 10/11 beta">
   <a href="LICENSE"><img src="https://img.shields.io/github/license/xiaoxing1617/usage-float" alt="MIT"></a>
+  <img src="https://visitor-badge.laobi.icu/badge?page_id=xiaoxing1617.usage-float&left_text=visitors&left_color=gray&right_color=orange" alt="visitors">
 </p>
 
 > ⭐ **If this little tool helps you, please give it a Star (top right)!** Every star keeps me going and helps others find it. You can also [buy me a coffee ☕](#support-the-author).

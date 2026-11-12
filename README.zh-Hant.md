@@ -7,6 +7,7 @@
   <img src="https://img.shields.io/badge/macOS-11%2B%20tested-black?logo=apple" alt="macOS 11+">
   <img src="https://img.shields.io/badge/Windows-10%2F11%20beta-0078D4?logo=windows" alt="Windows 10/11 beta">
   <a href="LICENSE"><img src="https://img.shields.io/github/license/xiaoxing1617/usage-float" alt="MIT"></a>
+  <img src="https://visitor-badge.laobi.icu/badge?page_id=xiaoxing1617.usage-float&left_text=%E8%A8%AA%E5%AE%A2&left_color=gray&right_color=orange" alt="visitors">
 </p>
 
 > ⭐ **如果這個小工具對你有幫助，請點一下右上角的 Star 支持一下！** 你的每一個 Star 都是我持續更新的動力，也能讓更多人發現它。也可以[請作者喝杯咖啡 ☕](#支持作者)。
